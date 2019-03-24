@@ -1,0 +1,16 @@
+#!/bin/bash
+#PBS -A colosse-users
+#PBS -l nodes=1:gpus={n_gpu}
+#PBS -l walltime={wall_time}
+#PBS -E
+#PBS -e {files_name}.err
+#PBS -o {files_name}.out
+{prioritization}
+
+# set the working directory to where the job is launched
+cd "${PBS_O_WORKDIR}"
+
+s_exec python -u train.py --config="{result_dir}/config.json" --helios-run="{start_time}"
+
+mv {files_name}.err {result_dir}/
+mv {files_name}.out {result_dir}/

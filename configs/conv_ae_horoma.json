@@ -1,0 +1,55 @@
+{
+    "name": "conv_ae_horoma",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 8,
+    "model": {
+        "type": "ConvolutionalAutoEncoder",
+        "args": {
+            "code_size": 100,
+            "cnn1_out_channels": 10,
+            "cnn1_kernel_size": 5,
+            "cnn2_out_channels": 20,
+            "cnn2_kernel_size": 5,
+            "lin2_in_channels": 200,
+            "maxpool_kernel": 2,
+            "dropout":0.1,
+            "loss_fct": "MSELoss"
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 10,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 10,
+        "type": "ClusterTrainer",
+        "options": {
+        }
+    },
+    "data": {
+        "dataloader": {
+            "split": 0.95,
+            "train": {
+                "batch_size": 128,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 128,
+                "shuffle": false
+            }
+        },
+        "dataset": {
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "flattened": false
+        }
+    }
+}

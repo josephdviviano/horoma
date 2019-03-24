@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -A colosse-users
+#PBS -l nodes=1:gpus=1
+#PBS -l walltime=14400
+#PBS -E
+#PBS -e ../submissions/b2phot1/checkpoint/variational/crossval.err
+#PBS -o ../submissions/b2phot1/checkpoint/variational/crossval.out
+
+
+# set the working directory to where the job is launched
+cd "${PBS_O_WORKDIR}"
+
+s_exec python -u cross_validation.py -p ../submissions/b2phot1/checkpoint/variational/ -m best_variational.pth -d ../data/horoma
