@@ -1,0 +1,51 @@
+{
+    "name": "autoencoder_cluster_kmeans_l10",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 8,
+     "model": {
+        "type": "AutoEncoder",
+        "args": {
+            "latent_dimension": 10
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 100,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 10,
+        "type": "ClusterTrainer",
+        "options": {
+            "n_clusters": 200,
+            "kmeans_interval": 0,
+            "kmeans_headstart": 1,
+            "kmeans_weight": 50.0
+        }
+    },
+    "data": {
+        "dataset": {
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "flattened": false
+        },
+        "dataloader": {
+            "split": 0.9,
+            "train": {
+                "batch_size": 128,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 128,
+                "shuffle": false
+            }
+        }
+    }
+}

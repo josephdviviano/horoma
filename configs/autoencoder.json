@@ -1,0 +1,47 @@
+{
+    "name":"autoencoder",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 4,
+    "model": {
+        "type": "AutoEncoder",
+        "args": {
+            "latent_dimension": 10
+        }
+    },
+    "loss": "MSELoss",
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 10,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 1
+    },
+    "data": {
+        "dataloader": {
+            "split": 0.9,
+            "train": {
+                "batch_size": 128,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 128,
+                "shuffle": false
+            }
+        },
+        "dataset": {
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "flattened": true
+        }
+    }
+}
+
+

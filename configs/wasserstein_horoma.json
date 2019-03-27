@@ -1,0 +1,49 @@
+{
+    "name": "wasserstein_horoma",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 4,
+    "cluster": "k_means",
+
+    "model": {
+        "type": "WassersteinAutoEncoder",
+        "args": {
+            "latent_dimension": 2,
+            "ksi": 10.0,
+            "dropout": 0.1
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 2,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 1
+    },
+    "data": {
+        "dataloader": {
+            "split": 0.9,
+            "train": {
+                "batch_size": 128,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 128,
+                "shuffle": false
+            }
+        },
+        "dataset": {
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "flattened": false
+        }
+    }
+}
+
