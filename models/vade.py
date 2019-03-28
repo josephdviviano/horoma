@@ -15,41 +15,52 @@ from torchvision.utils import save_image
 import numpy as np
 import math
 from sklearn.mixture import GaussianMixture
+from sklearn.utils.linear_assignment_ import linear_assignment
+
+LOG2PI = math.log(2*math.pi)
 
 def cluster_acc(Y_pred, Y):
-  from sklearn.utils.linear_assignment_ import linear_assignment
   assert Y_pred.size == Y.size
+
   D = max(Y_pred.max(), Y.max())+1
   w = np.zeros((D,D), dtype=np.int64)
+
   for i in range(Y_pred.size):
     w[Y_pred[i], Y[i]] += 1
   ind = linear_assignment(w.max() - w)
-  return sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w
+
+  return(sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w)
 
 def buildNetwork(layers, activation="relu", dropout=0):
+
     net = []
     for i in range(1, len(layers)):
         net.append(nn.Linear(layers[i-1], layers[i]))
+
         if activation=="relu":
             net.append(nn.ReLU())
         elif activation=="sigmoid":
             net.append(nn.Sigmoid())
+
         if dropout > 0:
             net.append(nn.Dropout(dropout))
-    return nn.Sequential(*net)
+
+    return(nn.Sequential(*net))
 
 def adjust_learning_rate(init_lr, optimizer, epoch):
+
     lr = max(init_lr * (0.9 ** (epoch//10)), 0.0002)
+
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr
-    return lr
 
-log2pi = math.log(2*math.pi)
+    return(lr)
+
 def log_likelihood_samples_unit_gaussian(samples):
-    return -0.5*log2pi*samples.size()[1] - torch.sum(0.5*(samples)**2, 1)
+    return -0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1)
 
 def log_likelihood_samplesImean_sigma(samples, mu, logvar):
-    return -0.5*log2pi*samples.size()[1] - torch.sum(0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1)
+    return -0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1)
 
 class VaDE(nn.Module):
 
@@ -57,7 +68,6 @@ class VaDE(nn.Module):
         Integer(2, 75, name="z_dim"),
         Integer(7, 150, name="n_centroids")
     ]
-
 
     def __init__(self, input_dim=784, z_dim=10, n_centroids=10, binary=True,
         encodeLayer=[500,500,2000], decodeLayer=[2000,500,500]):
@@ -70,6 +80,7 @@ class VaDE(nn.Module):
         self._enc_log_sigma = nn.Linear(encodeLayer[-1], z_dim)
         self._dec = nn.Linear(decodeLayer[-1], input_dim)
         self._dec_act = None
+
         if binary:
             self._dec_act = nn.Sigmoid()
 
@@ -87,6 +98,7 @@ class VaDE(nn.Module):
 
         self.eval()
         data = []
+
         for batch_idx, (inputs, _) in enumerate(dataloader):
             inputs = inputs.view(inputs.size(0), -1).float()
             if use_cuda:
@@ -94,6 +106,7 @@ class VaDE(nn.Module):
             inputs = Variable(inputs)
             z, outputs, mu, logvar = self.forward(inputs)
             data.append(z.data.cpu().numpy())
+
         data = np.concatenate(data)
         gmm = GaussianMixture(n_components=self.n_centroids,covariance_type='diag')
         gmm.fit(data)
@@ -101,25 +114,23 @@ class VaDE(nn.Module):
         self.lambda_p.data.copy_(torch.from_numpy(gmm.covariances_.T.astype(np.float32)))
 
     def reparameterize(self, mu, logvar):
+
         if self.training:
           std = logvar.mul(0.5).exp_()
           eps = Variable(std.data.new(std.size()).normal_())
-          # num = np.array([[ 1.096506  ,  0.3686553 , -0.43172026,  1.27677995,  1.26733758,
-          #       1.30626082,  0.14179629,  0.58619505, -0.76423112,  2.67965817]], dtype=np.float32)
-          # num = np.repeat(num, mu.size()[0], axis=0)
-          # eps = Variable(torch.from_numpy(num))
-          return eps.mul(std).add_(mu)
+          return(eps.mul(std).add_(mu))
         else:
-          return mu
+          return(mu)
 
     def decode(self, z):
         h = self.decoder(z)
         x = self._dec(h)
         if self._dec_act is not None:
             x = self._dec_act(x)
-        return x
+        return(x)
 
     def get_gamma(self, z, z_mean, z_log_var):
+
         Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
         z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
         z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
@@ -131,9 +142,10 @@ class VaDE(nn.Module):
             (Z-u_tensor3)**2/(2*lambda_tensor3), dim=1)) + 1e-10 # NxK
         gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
 
-        return gamma
+        return(gamma)
 
     def loss_function(self, recon_x, x, z, z_mean, z_log_var):
+        # TODO: replace all of this with get_gamma?
         Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
         z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
         z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
@@ -156,7 +168,7 @@ class VaDE(nn.Module):
         # Normalise by same number of elements as in reconstruction
         loss = torch.mean(BCE + logpzc + qentropy + logpc + logqcx)
 
-        return loss
+        return(loss)
 
     #===============================================================
     # below is defined according to the released code by the authors
@@ -203,12 +215,27 @@ class VaDE(nn.Module):
     #     # return torch.mean(qentropy)
     #     return loss
 
+    def log_marginal_likelihood_estimate(self, x, num_samples):
+        weight = torch.zeros(x.size(0))
+
+        for i in range(num_samples):
+            z, recon_x, mu, logvar = self.forward(x)
+            zloglikelihood = log_likelihood_samples_unit_gaussian(z)
+            dataloglikelihood = torch.sum(x*torch.log(torch.clamp(recon_x, min=1e-10))+
+                (1-x)*torch.log(torch.clamp(1-recon_x, min=1e-10)), 1)
+            log_qz = log_likelihood_samplesImean_sigma(z, mu, logvar)
+            weight += torch.exp(dataloglikelihood + zloglikelihood - log_qz).data
+
+        return(torch.log(torch.clamp(weight/num_samples, min=1e-40)))
+
+
+    # TODO: GET RID OF THE WHOLE DAMN THING
     def forward(self, x):
         h = self.encoder(x)
         mu = self._enc_mu(h)
         logvar = self._enc_log_sigma(h)
         z = self.reparameterize(mu, logvar)
-        return z, self.decode(z), mu, logvar
+        return(z, self.decode(z), mu, logvar)
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)
@@ -310,16 +337,4 @@ class VaDE(nn.Module):
                 sample = self.decode(sample).cpu()
                 save_image(sample.data.view(64, 1, 28, 28),
                            'results/vae/sample/sample_' + str(epoch) + '.png')
-
-    def log_marginal_likelihood_estimate(self, x, num_samples):
-        weight = torch.zeros(x.size(0))
-        for i in range(num_samples):
-            z, recon_x, mu, logvar = self.forward(x)
-            zloglikelihood = log_likelihood_samples_unit_gaussian(z)
-            dataloglikelihood = torch.sum(x*torch.log(torch.clamp(recon_x, min=1e-10))+
-                (1-x)*torch.log(torch.clamp(1-recon_x, min=1e-10)), 1)
-            log_qz = log_likelihood_samplesImean_sigma(z, mu, logvar)
-            weight += torch.exp(dataloglikelihood + zloglikelihood - log_qz).data
-        # pdb.set_trace()
-        return torch.log(torch.clamp(weight/num_samples, min=1e-40))
 
