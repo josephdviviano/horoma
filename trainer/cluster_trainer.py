@@ -77,6 +77,7 @@ class ClusterTrainer(Trainer):
         :param epoch: Current training epoch.
         :return: the loss for this epoch
         """
+        # Get model loss from Trainer class.
         loss = super(ClusterTrainer, self)._valid_epoch(epoch)
 
         self.cluster_collection.full_fit()
