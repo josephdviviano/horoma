@@ -1,23 +1,24 @@
 """
 Cloned from https://github.com/eelxpeng/UnsupervisedDeepLearning-Pytorch
-on Mar 28th 2019.
+on Mar 28th 2019. Style edits and refactoring by Joseph D Viviano.
 """
+from sklearn.mixture import GaussianMixture
+from sklearn.utils.linear_assignment_ import linear_assignment
+from torch.autograd import Variable
+from torch.nn import Parameter
+from torchvision import datasets, transforms
+from torchvision.utils import save_image
+import math
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import Parameter
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
-from torchvision import datasets, transforms
-from torch.autograd import Variable
-from torchvision.utils import save_image
-
-import numpy as np
-import math
-from sklearn.mixture import GaussianMixture
-from sklearn.utils.linear_assignment_ import linear_assignment
 
 LOG2PI = math.log(2*math.pi)
+EPS = 1e-10
+CUDA = torch.cuda.is_available()
 
 def cluster_acc(Y_pred, Y):
   assert Y_pred.size == Y.size
@@ -31,7 +32,8 @@ def cluster_acc(Y_pred, Y):
 
   return(sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w)
 
-def buildNetwork(layers, activation="relu", dropout=0):
+
+def build_network(layers, activation="relu", dropout=0):
 
     net = []
     for i in range(1, len(layers)):
@@ -47,20 +49,15 @@ def buildNetwork(layers, activation="relu", dropout=0):
 
     return(nn.Sequential(*net))
 
-def adjust_learning_rate(init_lr, optimizer, epoch):
-
-    lr = max(init_lr * (0.9 ** (epoch//10)), 0.0002)
-
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-    return(lr)
 
 def log_likelihood_samples_unit_gaussian(samples):
-    return -0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1)
+    return(-0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1))
+
 
 def log_likelihood_samplesImean_sigma(samples, mu, logvar):
-    return -0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1)
+    return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
+        0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
+
 
 class VaDE(nn.Module):
 
@@ -70,150 +67,213 @@ class VaDE(nn.Module):
     ]
 
     def __init__(self, input_dim=784, z_dim=10, n_centroids=10, binary=True,
-        encodeLayer=[500,500,2000], decodeLayer=[2000,500,500]):
+                 encode_layer=[500,500,2000], decode_layer=[2000,500,500]):
         super(self.__class__, self).__init__()
+
         self.z_dim = z_dim
         self.n_centroids = n_centroids
-        self.encoder = buildNetwork([input_dim] + encodeLayer)
-        self.decoder = buildNetwork([z_dim] + decodeLayer)
-        self._enc_mu = nn.Linear(encodeLayer[-1], z_dim)
-        self._enc_log_sigma = nn.Linear(encodeLayer[-1], z_dim)
-        self._dec = nn.Linear(decodeLayer[-1], input_dim)
+
+        self.encoder = build_network([input_dim] + encode_layer)
+        self.decoder = build_network([z_dim] + decode_layer)
+
+        self._enc_mu = nn.Linear(encode_layer[-1], z_dim)
+        self._enc_log_sigma = nn.Linear(encode_layer[-1], z_dim)
+        self._dec = nn.Linear(decode_layer[-1], input_dim)
         self._dec_act = None
 
         if binary:
             self._dec_act = nn.Sigmoid()
 
-        self.create_gmmparam(n_centroids, z_dim)
+        self.create_gmm_param()
 
-    def create_gmmparam(self, n_centroids, z_dim):
-        self.theta_p = nn.Parameter(torch.ones(n_centroids)/n_centroids)
-        self.u_p = nn.Parameter(torch.zeros(z_dim, n_centroids))
-        self.lambda_p = nn.Parameter(torch.ones(z_dim, n_centroids))
+    def create_gmm_param(self):
+        """
+        t_p = Probability of each gaussian (all equal for now)
+        u_p = Means of GMM
+        l_p = Covariances of GMM.
+        """
+
+        # TODO: Differen't weights for each Gaussian?
+        self.t_p = nn.Parameter(torch.ones(self.n_centroids)/self.n_centroids)
+
+        # Means of GMM
+        self.u_p = nn.Parameter(torch.zeros(self.z_dim, self.n_centroids))
+
+        # Covariances of GMM
+        self.l_p = nn.Parameter(torch.ones(self.z_dim, self.n_centroids))
 
     def initialize_gmm(self, dataloader):
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
+        """
+        Initializes a mixture of gaussians model by doing a forward pass of all
+        samples in "dataloader", saving the latent spaces, and then fitting
+        a gaussian mixture model (with self.n_centroids) to these latent 
+        variables. We save the means as u_p and covariances as l_p.
+        """
+        if CUDA:
             self.cuda()
 
         self.eval()
         data = []
 
+        # Get a collection of latent variables to fit the GMM to.
         for batch_idx, (inputs, _) in enumerate(dataloader):
             inputs = inputs.view(inputs.size(0), -1).float()
-            if use_cuda:
+
+            if CUDA:
                 inputs = inputs.cuda()
+
             inputs = Variable(inputs)
-            z, outputs, mu, logvar = self.forward(inputs)
+            z, _, _, _ = self.forward(inputs)
             data.append(z.data.cpu().numpy())
 
         data = np.concatenate(data)
-        gmm = GaussianMixture(n_components=self.n_centroids,covariance_type='diag')
+
+        # Fit the GMM, saving the means and covariances for each gaussian.
+        gmm = GaussianMixture(
+            n_components=self.n_centroids, covariance_type='diag')
         gmm.fit(data)
-        self.u_p.data.copy_(torch.from_numpy(gmm.means_.T.astype(np.float32)))
-        self.lambda_p.data.copy_(torch.from_numpy(gmm.covariances_.T.astype(np.float32)))
+        self.u_p.data.copy_(torch.from_numpy(
+            gmm..means_.T.astype(np.float32)))
+        self.l_p.data.copy_(torch.from_numpy(
+            gmm.covariances_.T.astype(np.float32)))
 
-    def reparameterize(self, mu, logvar):
-
+    def reparameterize(self, mu, lv):
+        """
+        Reparameterizion trick to get the mean and log variance of the encoder.
+        """
         if self.training:
-          std = logvar.mul(0.5).exp_()
+          std = lv.mul(0.5).exp_()
           eps = Variable(std.data.new(std.size()).normal_())
           return(eps.mul(std).add_(mu))
         else:
           return(mu)
 
+    def forward(self, x):
+        """
+        Return the latent, mu, logvar, and reconstruction for a minibatch.
+        """
+        z, mu, logvar = self.encode(x)
+        x_recon = self.decode(z)
+
+        return(x_recon, x, z, mu, logvar)
+
+    def encode(self, x):
+        """Encode x into latent z."""
+        hid = self.encoder(x)
+        mu = self._enc_mu(hid)
+        logvar = self._enc_log_sigma(hid)
+        z = self.reparameterize(mu, logvar)
+
+        return(z, mu, logvar)
+
     def decode(self, z):
-        h = self.decoder(z)
-        x = self._dec(h)
+        """Reconstruct x from latent z."""
+        hid = self.decoder(z)
+        x_recon = self._dec(hid)
         if self._dec_act is not None:
-            x = self._dec_act(x)
-        return(x)
+            x_recon = self._dec_act(x_recon)
 
-    def get_gamma(self, z, z_mean, z_log_var):
+        return(x_recon)
 
-        Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-        z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
-        z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
-        u_tensor3 = self.u_p.unsqueeze(0).expand(z.size()[0], self.u_p.size()[0], self.u_p.size()[1]) # NxDxK
-        lambda_tensor3 = self.lambda_p.unsqueeze(0).expand(z.size()[0], self.lambda_p.size()[0], self.lambda_p.size()[1])
-        theta_tensor2 = self.theta_p.unsqueeze(0).expand(z.size()[0], self.n_centroids) # NxK
+    def get_t_2d(self, z):
+        z_x = z.size()[0]
+        t_2d = self.t_p.unsqueeze(0).expand(z_x, self.n_centroids)
 
-        p_c_z = torch.exp(torch.log(theta_tensor2) - torch.sum(0.5*torch.log(2*math.pi*lambda_tensor3)+\
-            (Z-u_tensor3)**2/(2*lambda_tensor3), dim=1)) + 1e-10 # NxK
+        return(t_2d)
+
+    def get_u_3d(self, z):
+        """Means of GMM."""
+        z_x = z.size()[0]
+        u_p_x = self.u_p.size()[0]
+        u_p_y = self.u_p.size()[1]
+        u_3d = self.u_p.unsqueeze(0).expand(z_x, u_p_x, u_p_y)
+
+        return(u_3d)
+
+    def get_l_3d(self, z):
+        """Covs of GMM.""" 
+        z_x = z.size()[0]
+        l_p_x = self.l_p.size()[0]
+        l_p_y = self.l_p.size()[1]
+        l_3d = self.l_p.unsqueeze(0).expand(z_x, l_p_x, l_p_y)
+
+        return(l_3d)
+
+    def get_z_mu_t(self, z_mu):
+        z_mu_x = z_mu.size()[0]        
+        z_mu_y = z_mu.size()[1]
+        z_mu_t = z_mu.unsqueeze(2).expand(z_mu_x, z_mu_y, self.n_centroids)
+
+        return(z_mu_t)
+
+    def get_z_lv_t(self, z_lv):
+        z_lv_x = z_lv.size()[0]
+        z_lv_y = z_lv.size()[1]
+        z_lv_t = z_lv.unsqueeze(2).expand(z_lv_x, z_lv_y, self.n_centroids)
+
+        return(z_lv_t)
+
+
+    def get_gamma(self, z, z_mu, z_lv):
+        """
+        z is the latent, z_mean is the mean of the latent, and z_lvar is the
+        log variance of the latent.
+
+        gamma is q_c_x, of which p_c_z estimates (eqn 15).
+        """
+        z_x = z.size()[0]
+        z_y = z.size()[1]
+
+        # NxDxK
+        Z = z.unsqueeze(2).expand(z_x, z_y, self.n_centroids) 
+        z_mu_t = self.get_z_mu_t(z_mu)  # Mean of z.
+        z_lv_t = self.get_z_lv_t(z_lv)  # Log variance of z.
+        u_3d = self.get_u_3d(z)  # Means of GMM.
+        l_3d = self.get_l_3d(z)  # Covs of GMM.
+
+        # NxK
+        t_2d = self.get_t_2d(z)  # p(c)
+        p_c_z = torch.exp(torch.log(t_2d) - torch.sum(0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d), dim=1)) + EPS
         gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
 
         return(gamma)
 
-    def loss_function(self, recon_x, x, z, z_mean, z_log_var):
-        # TODO: replace all of this with get_gamma?
-        Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-        z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
-        z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
-        u_tensor3 = self.u_p.unsqueeze(0).expand(z.size()[0], self.u_p.size()[0], self.u_p.size()[1]) # NxDxK
-        lambda_tensor3 = self.lambda_p.unsqueeze(0).expand(z.size()[0], self.lambda_p.size()[0], self.lambda_p.size()[1])
-        theta_tensor2 = self.theta_p.unsqueeze(0).expand(z.size()[0], self.n_centroids) # NxK
+    def loss(self, recon_x, x, z, z_mu, z_lv):
 
-        p_c_z = torch.exp(torch.log(theta_tensor2) - torch.sum(0.5*torch.log(2*math.pi*lambda_tensor3)+\
-            (Z-u_tensor3)**2/(2*lambda_tensor3), dim=1)) + 1e-10 # NxK
-        gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True) # NxK
+        # NxDxK
+        z_mu_t = self.get_z_mu_t(z_mu)  # Mean of z.
+        z_lv_t = self.get_z_lv_t(z_lv)  # Log variance of z.
+        u_3d = self.get_u_3d(z)  # Means of GMM.
+        l_3d = self.get_l_3d(z)  # Covs of GMM.
 
-        BCE = -torch.sum(x*torch.log(torch.clamp(recon_x, min=1e-10))+
-            (1-x)*torch.log(torch.clamp(1-recon_x, min=1e-10)), 1)
-        logpzc = torch.sum(0.5*gamma*torch.sum(math.log(2*math.pi)+torch.log(lambda_tensor3)+\
-            torch.exp(z_log_var_t)/lambda_tensor3 + (z_mean_t-u_tensor3)**2/lambda_tensor3, dim=1), dim=1)
-        qentropy = -0.5*torch.sum(1+z_log_var+math.log(2*math.pi), 1)
-        logpc = -torch.sum(torch.log(theta_tensor2)*gamma, 1)
+        # NxK
+        gamma = self.get_gamma(z, z_mu, z_lv) 
+        t_2d = self.get_t_2d(z)  # for p(c)
+
+        # log p(x|z)
+        bce = -torch.sum(
+            x*torch.log(torch.clamp(recon_x, min=EPS)) +
+            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), 1)
+
+        # log p(z|c)
+        logpzc = torch.sum(
+            0.5 * gamma * torch.sum(
+                math.log(2*math.pi) + torch.log(l_3d) + 
+                torch.exp(z_lv_t)/l_3d + (z_mu_t-u_3d)**2/l_3d, dim=1), dim=1)
+
+        # log q(z|x)
+        qentropy = -0.5 * torch.sum(1 + z_lv + math.log(2*math.pi), 1)
+
+        # log p(c)
+        logpc = -torch.sum(torch.log(t_2d)*gamma, 1)
+
+        # log q(c|x)
         logqcx = torch.sum(torch.log(gamma)*gamma, 1)
 
-        # Normalise by same number of elements as in reconstruction
-        loss = torch.mean(BCE + logpzc + qentropy + logpc + logqcx)
+        # Normalise by same number of elements as in reconstruction.
+        loss = torch.mean(bce + logpzc + qentropy + logpc + logqcx)
 
         return(loss)
-
-    #===============================================================
-    # below is defined according to the released code by the authors
-    # However, they are incorrect in several places
-    #===============================================================
-
-    # def get_gamma(self, z, z_mean, z_log_var):
-    #     Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-    #     z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
-    #     z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
-    #     u_tensor3 = self.u_p.unsqueeze(0).expand(z.size()[0], self.u_p.size()[0], self.u_p.size()[1]) # NxDxK
-    #     lambda_tensor3 = self.lambda_p.unsqueeze(0).expand(z.size()[0], self.lambda_p.size()[0], self.lambda_p.size()[1])
-    #     theta_tensor3 = self.theta_p.unsqueeze(0).unsqueeze(1).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-
-    #     p_c_z = torch.exp(torch.sum(torch.log(theta_tensor3) - 0.5*torch.log(2*math.pi*lambda_tensor3)-\
-    #         (Z-u_tensor3)**2/(2*lambda_tensor3), dim=1)) + 1e-10 # NxK
-    #     gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True) # NxK
-
-    #     return gamma
-
-    # def loss_function(self, recon_x, x, z, z_mean, z_log_var):
-    #     Z = z.unsqueeze(2).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-    #     z_mean_t = z_mean.unsqueeze(2).expand(z_mean.size()[0], z_mean.size()[1], self.n_centroids)
-    #     z_log_var_t = z_log_var.unsqueeze(2).expand(z_log_var.size()[0], z_log_var.size()[1], self.n_centroids)
-    #     u_tensor3 = self.u_p.unsqueeze(0).expand(z.size()[0], self.u_p.size()[0], self.u_p.size()[1]) # NxDxK
-    #     lambda_tensor3 = self.lambda_p.unsqueeze(0).expand(z.size()[0], self.lambda_p.size()[0], self.lambda_p.size()[1])
-    #     theta_tensor3 = self.theta_p.unsqueeze(0).unsqueeze(1).expand(z.size()[0], z.size()[1], self.n_centroids) # NxDxK
-
-    #     p_c_z = torch.exp(torch.sum(torch.log(theta_tensor3) - 0.5*torch.log(2*math.pi*lambda_tensor3)-\
-    #         (Z-u_tensor3)**2/(2*lambda_tensor3), dim=1)) + 1e-10 # NxK
-    #     gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True) # NxK
-    #     gamma_t = gamma.unsqueeze(1).expand(gamma.size(0), self.z_dim, gamma.size(1)) #
-
-    #     BCE = -torch.sum(x*torch.log(torch.clamp(recon_x, min=1e-10))+
-    #         (1-x)*torch.log(torch.clamp(1-recon_x, min=1e-10)), 1)
-    #     logpzc = torch.sum(torch.sum(0.5*gamma_t*(self.z_dim*math.log(2*math.pi)+torch.log(lambda_tensor3)+\
-    #         torch.exp(z_log_var_t)/lambda_tensor3 + (z_mean_t-u_tensor3)**2/lambda_tensor3), dim=1), dim=1)
-    #     qentropy = -0.5*torch.sum(1+z_log_var+math.log(2*math.pi), 1)
-    #     logpc = -torch.sum(torch.log(self.theta_p.unsqueeze(0).expand(z.size()[0], self.n_centroids))*gamma, 1)
-    #     logqcx = torch.sum(torch.log(gamma)*gamma, 1)
-
-    #     loss = torch.mean(BCE + logpzc + qentropy + logpc + logqcx)
-
-    #     # return torch.mean(qentropy)
-    #     return loss
 
     def log_marginal_likelihood_estimate(self, x, num_samples):
         weight = torch.zeros(x.size(0))
@@ -221,21 +281,15 @@ class VaDE(nn.Module):
         for i in range(num_samples):
             z, recon_x, mu, logvar = self.forward(x)
             zloglikelihood = log_likelihood_samples_unit_gaussian(z)
-            dataloglikelihood = torch.sum(x*torch.log(torch.clamp(recon_x, min=1e-10))+
-                (1-x)*torch.log(torch.clamp(1-recon_x, min=1e-10)), 1)
+
+            dataloglikelihood = torch.sum(
+                x*torch.log(torch.clamp(recon_x, min=EPS)) +
+                (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), 1)
+
             log_qz = log_likelihood_samplesImean_sigma(z, mu, logvar)
             weight += torch.exp(dataloglikelihood + zloglikelihood - log_qz).data
 
         return(torch.log(torch.clamp(weight/num_samples, min=1e-40)))
-
-
-    # TODO: GET RID OF THE WHOLE DAMN THING
-    def forward(self, x):
-        h = self.encoder(x)
-        mu = self._enc_mu(h)
-        logvar = self._enc_log_sigma(h)
-        z = self.reparameterize(mu, logvar)
-        return(z, self.decode(z), mu, logvar)
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)
@@ -246,95 +300,3 @@ class VaDE(nn.Module):
         pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
         model_dict.update(pretrained_dict)
         self.load_state_dict(model_dict)
-
-    def fit(self, trainloader, validloader, lr=0.001, batch_size=128, num_epochs=10,
-        visualize=False, anneal=False):
-        use_cuda = torch.cuda.is_available()
-        if use_cuda:
-            self.cuda()
-
-        optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=lr)
-
-        # validate
-        self.eval()
-        valid_loss = 0.0
-        for batch_idx, (inputs, _) in enumerate(validloader):
-            inputs = inputs.view(inputs.size(0), -1).float()
-            if use_cuda:
-                inputs = inputs.cuda()
-            inputs = Variable(inputs)
-            z, outputs, mu, logvar = self.forward(inputs)
-
-            loss = self.loss_function(outputs, inputs, z, mu, logvar)
-            valid_loss += loss.data[0]*len(inputs)
-            # total_loss += valid_recon_loss.data[0] * inputs.size()[0]
-            # total_num += inputs.size()[0]
-
-        # valid_loss = total_loss / total_num
-        print("#Epoch -1: Valid Loss: %.5f" % (valid_loss / len(validloader.dataset)))
-
-        for epoch in range(num_epochs):
-            # train 1 epoch
-            self.train()
-            if anneal:
-                epoch_lr = adjust_learning_rate(lr, optimizer, epoch)
-            train_loss = 0
-            for batch_idx, (inputs, _) in enumerate(trainloader):
-                inputs = inputs.view(inputs.size(0), -1).float()
-                if use_cuda:
-                    inputs = inputs.cuda()
-                optimizer.zero_grad()
-                inputs = Variable(inputs)
-
-                z, outputs, mu, logvar = self.forward(inputs)
-                loss = self.loss_function(outputs, inputs, z, mu, logvar)
-                train_loss += loss.data[0]*len(inputs)
-                loss.backward()
-                optimizer.step()
-                # print("    #Iter %3d: Reconstruct Loss: %.3f" % (
-                #     batch_idx, recon_loss.data[0]))
-
-            # validate
-            self.eval()
-            valid_loss = 0.0
-            Y = []
-            Y_pred = []
-            for batch_idx, (inputs, labels) in enumerate(validloader):
-                inputs = inputs.view(inputs.size(0), -1).float()
-                if use_cuda:
-                    inputs = inputs.cuda()
-                inputs = Variable(inputs)
-                z, outputs, mu, logvar = self.forward(inputs)
-
-                loss = self.loss_function(outputs, inputs, z, mu, logvar)
-                valid_loss += loss.data[0]*len(inputs)
-                # total_loss += valid_recon_loss.data[0] * inputs.size()[0]
-                # total_num += inputs.size()[0]
-                gamma = self.get_gamma(z, mu, logvar).data.cpu().numpy()
-                Y.append(labels.numpy())
-                Y_pred.append(np.argmax(gamma, axis=1))
-
-                # view reconstruct
-                if visualize and batch_idx == 0:
-                    n = min(inputs.size(0), 8)
-                    comparison = torch.cat([inputs.view(-1, 1, 28, 28)[:n],
-                                            outputs.view(-1, 1, 28, 28)[:n]])
-                    save_image(comparison.data.cpu(),
-                                 'results/vae/reconstruct/reconstruction_' + str(epoch) + '.png', nrow=n)
-
-            Y = np.concatenate(Y)
-            Y_pred = np.concatenate(Y_pred)
-            acc = cluster_acc(Y_pred, Y)
-            # valid_loss = total_loss / total_num
-            print("#Epoch %3d: lr: %.5f, Train Loss: %.5f, Valid Loss: %.5f, acc: %.5f" % (
-                epoch, epoch_lr, train_loss / len(trainloader.dataset), valid_loss / len(validloader.dataset), acc[0]))
-
-            # view sample
-            if visualize:
-                sample = Variable(torch.randn(64, self.z_dim))
-                if use_cuda:
-                   sample = sample.cuda()
-                sample = self.decode(sample).cpu()
-                save_image(sample.data.view(64, 1, 28, 28),
-                           'results/vae/sample/sample_' + str(epoch) + '.png')
-
