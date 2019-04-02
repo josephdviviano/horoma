@@ -39,23 +39,6 @@ def cluster_acc(Y_pred, Y):
   return(sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w)
 
 
-def build_network(layers, activation="relu", dropout=0):
-
-    net = []
-    for i in range(1, len(layers)):
-        net.append(nn.Linear(layers[i-1], layers[i]))
-
-        if activation=="relu":
-            net.append(nn.ReLU())
-        elif activation=="sigmoid":
-            net.append(nn.Sigmoid())
-
-        if dropout > 0:
-            net.append(nn.Dropout(dropout))
-
-    return(nn.Sequential(*net))
-
-
 def log_likelihood_samples_unit_gaussian(samples):
     return(-0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1))
 
@@ -85,7 +68,6 @@ class VaDE(nn.Module):
         self.maxpool = nn.MaxPool2d(maxpool_kernel)
 
         # Architecture copied from best performing model, conv_ae.py
-
         last_w = self._calc_output_size(
             IMAGE_W, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
         last_h = self._calc_output_size(
@@ -173,13 +155,13 @@ class VaDE(nn.Module):
 
         # Get a collection of latent variables to fit the GMM to.
         for batch_idx, inputs in enumerate(dataloader):
-            inputs = inputs.view(inputs.size(0), -1).float()
+            #inputs = inputs.view(inputs.size(0), -1).float()
 
             if CUDA:
                 inputs = inputs.cuda()
 
             inputs = Variable(inputs)
-            z, _, _, _ = self.forward(inputs)
+            z, _, _ = self.encode(inputs)
             data.append(z.data.cpu().numpy())
 
         data = np.concatenate(data)
