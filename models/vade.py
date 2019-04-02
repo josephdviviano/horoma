@@ -4,6 +4,7 @@ on Mar 28th 2019. Style edits and refactoring by Joseph D Viviano.
 """
 from sklearn.mixture import GaussianMixture
 from sklearn.utils.linear_assignment_ import linear_assignment
+from skopt.space import Real, Integer
 from torch.autograd import Variable
 from torch.nn import Parameter
 from torchvision import datasets, transforms
@@ -15,6 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
+
 
 LOG2PI = math.log(2*math.pi)
 EPS = 1e-10
@@ -106,7 +108,7 @@ class VaDE(nn.Module):
         """
         Initializes a mixture of gaussians model by doing a forward pass of all
         samples in "dataloader", saving the latent spaces, and then fitting
-        a gaussian mixture model (with self.n_centroids) to these latent 
+        a gaussian mixture model (with self.n_centroids) to these latent
         variables. We save the means as u_p and covariances as l_p.
         """
         if CUDA:
@@ -133,7 +135,7 @@ class VaDE(nn.Module):
             n_components=self.n_centroids, covariance_type='diag')
         gmm.fit(data)
         self.u_p.data.copy_(torch.from_numpy(
-            gmm..means_.T.astype(np.float32)))
+            gmm.means_.T.astype(np.float32)))
         self.l_p.data.copy_(torch.from_numpy(
             gmm.covariances_.T.astype(np.float32)))
 
@@ -191,7 +193,7 @@ class VaDE(nn.Module):
         return(u_3d)
 
     def get_l_3d(self, z):
-        """Covs of GMM.""" 
+        """Covs of GMM."""
         z_x = z.size()[0]
         l_p_x = self.l_p.size()[0]
         l_p_y = self.l_p.size()[1]
@@ -200,7 +202,7 @@ class VaDE(nn.Module):
         return(l_3d)
 
     def get_z_mu_t(self, z_mu):
-        z_mu_x = z_mu.size()[0]        
+        z_mu_x = z_mu.size()[0]
         z_mu_y = z_mu.size()[1]
         z_mu_t = z_mu.unsqueeze(2).expand(z_mu_x, z_mu_y, self.n_centroids)
 
@@ -225,7 +227,7 @@ class VaDE(nn.Module):
         z_y = z.size()[1]
 
         # NxDxK
-        Z = z.unsqueeze(2).expand(z_x, z_y, self.n_centroids) 
+        Z = z.unsqueeze(2).expand(z_x, z_y, self.n_centroids)
         z_mu_t = self.get_z_mu_t(z_mu)  # Mean of z.
         z_lv_t = self.get_z_lv_t(z_lv)  # Log variance of z.
         u_3d = self.get_u_3d(z)  # Means of GMM.
@@ -247,7 +249,7 @@ class VaDE(nn.Module):
         l_3d = self.get_l_3d(z)  # Covs of GMM.
 
         # NxK
-        gamma = self.get_gamma(z, z_mu, z_lv) 
+        gamma = self.get_gamma(z, z_mu, z_lv)
         t_2d = self.get_t_2d(z)  # for p(c)
 
         # log p(x|z)
@@ -258,7 +260,7 @@ class VaDE(nn.Module):
         # log p(z|c)
         logpzc = torch.sum(
             0.5 * gamma * torch.sum(
-                math.log(2*math.pi) + torch.log(l_3d) + 
+                math.log(2*math.pi) + torch.log(l_3d) +
                 torch.exp(z_lv_t)/l_3d + (z_mu_t-u_3d)**2/l_3d, dim=1), dim=1)
 
         # log q(z|x)
