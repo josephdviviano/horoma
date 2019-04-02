@@ -17,6 +17,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
 
+from configs.constants import IMAGE_SIZE, INPUT_CHANNELS, IMAGE_H, IMAGE_W
+
+PAD = 0
+STRIDE = 1
 
 LOG2PI = math.log(2*math.pi)
 EPS = 1e-10
@@ -65,28 +69,78 @@ class VaDE(nn.Module):
 
     model_hyperparameters_space = [
         Integer(2, 75, name="z_dim"),
-        Integer(7, 150, name="n_centroids")
+        Integer(7, 150, name="n_centroids"),
+        Real(0.1, 0.5, name="dropout")
     ]
 
-    def __init__(self, input_dim=784, z_dim=10, n_centroids=10, binary=True,
-                 encode_layer=[500,500,2000], decode_layer=[2000,500,500]):
+    def __init__(self, z_dim=10, n_centroids=10, binary=True,
+                 cnn1_out_channels=10, cnn2_out_channels=20, cnn_kernel_size=5,
+                 lin2_in_channels=50, maxpool_kernel=2, dropout=0.1):
         super(self.__class__, self).__init__()
 
         self.z_dim = z_dim
         self.n_centroids = n_centroids
+        self.dropout = nn.Dropout(dropout)
+        self.activation = nn.SELU()
+        self.maxpool = nn.MaxPool2d(maxpool_kernel)
 
-        self.encoder = build_network([input_dim] + encode_layer)
-        self.decoder = build_network([z_dim] + decode_layer)
+        # Architecture copied from best performing model, conv_ae.py
 
-        self._enc_mu = nn.Linear(encode_layer[-1], z_dim)
-        self._enc_log_sigma = nn.Linear(encode_layer[-1], z_dim)
-        self._dec = nn.Linear(decode_layer[-1], input_dim)
+        last_w = self._calc_output_size(
+            IMAGE_W, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
+        last_h = self._calc_output_size(
+            IMAGE_H, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
+
+        self.encoder_cnn = nn.Sequential(
+            nn.Conv2d(INPUT_CHANNELS, cnn1_out_channels, cnn_kernel_size),
+            self.maxpool,
+            self.activation,
+            self.dropout,
+            nn.Conv2d(cnn1_out_channels, cnn2_out_channels, cnn_kernel_size),
+            self.maxpool,
+            self.activation,
+            self.dropout
+        )
+
+        self.encoder_mlp = nn.Sequential(
+            nn.Linear(cnn2_out_channels * last_w * last_h, lin2_in_channels),
+            self.activation,
+            self.dropout
+        )
+
+        self.decoder = nn.Sequential(
+            nn.Linear(self.z_dim, cnn2_out_channels * last_w * last_h),
+            self.activation,
+            nn.Linear(cnn2_out_channels * last_w * last_h,
+                      IMAGE_SIZE * INPUT_CHANNELS)
+        )
+
+        self._enc_mu = nn.Linear(lin2_in_channels, z_dim)
+        self._enc_log_sigma = nn.Linear(lin2_in_channels, z_dim)
         self._dec_act = None
 
         if binary:
             self._dec_act = nn.Sigmoid()
 
         self.create_gmm_param()
+
+    def _calc_output_size(self, width, kernel, pad, stride, pool,
+                          level=1, n_levels=1):
+        """
+        Recursively calculates the output image width / height given a square
+        input. Assumes the same padding, kernel size, and stride were applied
+        at all layers.
+        """
+        assert level <= n_levels
+        assert level > 0 and n_levels > 0
+
+        out = int(((width - kernel + (2*pad) / stride) + 1) / pool)
+
+        if level < n_levels:
+            out = self._calc_output_size(out, kernel, pad, stride, pool,
+                                         level=level+1, n_levels=n_levels)
+
+        return(out)
 
     def create_gmm_param(self):
         """
@@ -118,7 +172,7 @@ class VaDE(nn.Module):
         data = []
 
         # Get a collection of latent variables to fit the GMM to.
-        for batch_idx, (inputs, _) in enumerate(dataloader):
+        for batch_idx, inputs in enumerate(dataloader):
             inputs = inputs.view(inputs.size(0), -1).float()
 
             if CUDA:
@@ -161,7 +215,9 @@ class VaDE(nn.Module):
 
     def encode(self, x):
         """Encode x into latent z."""
-        hid = self.encoder(x)
+        hid = self.encoder_cnn(x)
+        hid = hid.view([hid.size(0), -1])
+        hid = self.encoder_mlp(hid)
         mu = self._enc_mu(hid)
         logvar = self._enc_log_sigma(hid)
         z = self.reparameterize(mu, logvar)
@@ -170,10 +226,13 @@ class VaDE(nn.Module):
 
     def decode(self, z):
         """Reconstruct x from latent z."""
-        hid = self.decoder(z)
-        x_recon = self._dec(hid)
+        x_recon = self.decoder(z)
+
+        # Applies Sigmoid if binary=true.
         if self._dec_act is not None:
             x_recon = self._dec_act(x_recon)
+
+        x_recon = x_recon.view((z.size(0), INPUT_CHANNELS, IMAGE_H, IMAGE_W))
 
         return(x_recon)
 
