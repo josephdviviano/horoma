@@ -7,13 +7,15 @@
     "model": {
         "type": "VaDE",
         "args": {
-            "input_dim": 10,
             "z_dim": 10,
             "n_centroids": 10,
-            "binary": false,
-            "encode_layers": [500,500,2000],
-            "decode_layers": [2000,500,500],
-            "loss_fct": "MSELoss"
+            "binary": true,
+            "cnn_kernel_size": 5,
+            "cnn1_out_channels": 10,
+            "cnn2_out_channels": 20,
+            "lin2_in_channels": 50,
+            "maxpool_kernel": 2,
+            "dropout": 0.1
         }
     },
     "optimizer": {
