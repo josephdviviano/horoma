@@ -160,10 +160,14 @@ class ClusterHelper:
 
                 data = data.to(self.device)
 
-                z = self.model.encode(data).cpu()
+                z = self.model.encode(data)
 
+                # Assume the latent representation is the first item
+                # returned by self.encode(). Move it to the cpu.
                 if isinstance(z, tuple) or isinstance(data, list):
-                    z = z[0]
+                    z = z[0].cpu()
+                else:
+                    z = z.cpu()
 
                 embeddings.append(z.detach().numpy())
 
