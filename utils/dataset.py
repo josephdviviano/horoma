@@ -51,7 +51,13 @@ class HoromaDataset(Dataset):
         self.region_ids = np.loadtxt(filename_region_ids, dtype=object)
 
         self.targets = None
-        if os.path.exists(filename_y) and not split.startswith("train"):
+
+        # Ignore the labels for some kinds of training data.
+        # TODO: Resolve why this is different from previous team? They
+        #       seemed to be working with different data.
+        #if os.path.exists(filename_y) and not split.startswith("train"):
+        IGNORE_LABELS = ["train_overlapped", "train"]
+        if os.path.exists(filename_y) and split not in IGNORE_LABELS:
             pre_targets = np.loadtxt(filename_y, 'U2')
 
             if subset is None:
@@ -66,17 +72,12 @@ class HoromaDataset(Dataset):
                 for t in pre_targets
             ])
 
-        try:
-            print("ok")
-            self.data = np.memmap(
-                filename_x,
-                dtype=datatype,
-                mode="r",
-                shape=(self.nb_examples, height, width, nb_channels)
-            )
-        except:
-            import IPython; IPython.embed()
-
+        self.data = np.memmap(
+            filename_x,
+            dtype=datatype,
+            mode="r",
+            shape=(self.nb_examples, height, width, nb_channels)
+        )
 
         if subset is None:
             self.data = self.data[skip: None]
