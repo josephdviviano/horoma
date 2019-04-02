@@ -26,15 +26,19 @@ class HoromaDataset(Dataset):
         datatype = "uint8"
 
         if split == "train":
-            self.nb_examples = 150900
+            self.nb_examples = 152000  # old: 150900
         elif split == "valid":
-            self.nb_examples = 480
+            self.nb_examples = 252  # old: 480
+        elif split == "train_labeled":
+            self.nb_examples = 228  # old: DNE
         elif split == "test":
-            self.nb_examples = 498
+            self.nb_examples = 498  # unchanged
         elif split == "train_overlapped":
-            self.nb_examples = 544749
+            self.nb_examples = 548720  # old: 544749
+        elif split == "train_labeled_overlapped":
+            self.nb_examples = 635  # old: DNE
         elif split == "valid_overlapped":
-            self.nb_examples = 1331
+            self.nb_examples = 696  # old: 1331
         else:
             raise ("Dataset: Invalid split. "
                    "Must be [train, valid, test, train_overlapped, valid_overlapped]")
@@ -62,12 +66,17 @@ class HoromaDataset(Dataset):
                 for t in pre_targets
             ])
 
-        self.data = np.memmap(
-            filename_x,
-            dtype=datatype,
-            mode="r",
-            shape=(self.nb_examples, height, width, nb_channels)
-        )
+        try:
+            print("ok")
+            self.data = np.memmap(
+                filename_x,
+                dtype=datatype,
+                mode="r",
+                shape=(self.nb_examples, height, width, nb_channels)
+            )
+        except:
+            import IPython; IPython.embed()
+
 
         if subset is None:
             self.data = self.data[skip: None]
