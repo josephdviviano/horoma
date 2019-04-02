@@ -39,15 +39,6 @@ def cluster_acc(Y_pred, Y):
   return(sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w)
 
 
-def log_likelihood_samples_unit_gaussian(samples):
-    return(-0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1))
-
-
-def log_likelihood_samplesImean_sigma(samples, mu, logvar):
-    return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
-        0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
-
-
 class VaDE(nn.Module):
 
     model_hyperparameters_space = [
@@ -123,6 +114,86 @@ class VaDE(nn.Module):
                                          level=level+1, n_levels=n_levels)
 
         return(out)
+
+    def _get_t_2d(self, z):
+        """Gaussian weights for z. TODO: currently all identical."""
+        z_x = z.size()[0]
+        t_2d = self.t_p.unsqueeze(0).expand(z_x, self.n_centroids)
+
+        return(t_2d)
+
+    def _get_u_3d(self, z):
+        """Means of GMM."""
+        z_x = z.size()[0]
+        u_p_x = self.u_p.size()[0]
+        u_p_y = self.u_p.size()[1]
+        u_3d = self.u_p.unsqueeze(0).expand(z_x, u_p_x, u_p_y)
+
+        return(u_3d)
+
+    def _get_l_3d(self, z):
+        """Covs of GMM."""
+        z_x = z.size()[0]
+        l_p_x = self.l_p.size()[0]
+        l_p_y = self.l_p.size()[1]
+        l_3d = self.l_p.unsqueeze(0).expand(z_x, l_p_x, l_p_y)
+
+        return(l_3d)
+
+    def _get_z_mu_t(self, z_mu):
+        """Get means of latent."""
+        z_mu_x = z_mu.size()[0]
+        z_mu_y = z_mu.size()[1]
+        z_mu_t = z_mu.unsqueeze(2).expand(z_mu_x, z_mu_y, self.n_centroids)
+
+        return(z_mu_t)
+
+    def _get_z_lv_t(self, z_lv):
+        """Get log variances of latent."""
+        z_lv_x = z_lv.size()[0]
+        z_lv_y = z_lv.size()[1]
+        z_lv_t = z_lv.unsqueeze(2).expand(z_lv_x, z_lv_y, self.n_centroids)
+
+        return(z_lv_t)
+
+
+    def _get_gamma(self, z, z_mu, z_lv):
+        """
+        z is the latent, z_mean is the mean of the latent, and z_lvar is the
+        log variance of the latent.
+
+        gamma is q_c_x, of which p_c_z estimates (eqn 15).
+        """
+        z_x = z.size()[0]
+        z_y = z.size()[1]
+
+        # NxDxK
+        Z = z.unsqueeze(2).expand(z_x, z_y, self.n_centroids)
+        z_mu_t = self._get_z_mu_t(z_mu)  # Mean of z.
+        z_lv_t = self._get_z_lv_t(z_lv)  # Log variance of z.
+        u_3d = self._get_u_3d(z)  # Means of GMM.
+        l_3d = self._get_l_3d(z)  # Covs of GMM.
+
+        # NxK
+        # q(c|x) = p(c|z) = p(c)p(z|c), p(z|c) = normal(z|mu_c, sigma_c)
+        # also see eq. 2.192 from Bishop 2006.
+        t_2d = self.get_t_2d(z)
+        p_c = torch.log(t_2d)
+        p_z_c = 0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d)
+        p_c_z = torch.exp(p_c - torch.sum(p_z_c, dim=1)) + EPS
+        gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
+
+        return(gamma)
+
+    def _log_pz_samples(samples):
+        """Log liklihood of samples from the prior."""
+        return(-0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1))
+
+    def _log_qz_samples(samples, mu, logvar):
+        """Log likelihood of samples from the posterior."""
+        return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
+            0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
+
 
     def create_gmm_param(self):
         """
@@ -218,80 +289,17 @@ class VaDE(nn.Module):
 
         return(x_recon)
 
-    def get_t_2d(self, z):
-        z_x = z.size()[0]
-        t_2d = self.t_p.unsqueeze(0).expand(z_x, self.n_centroids)
-
-        return(t_2d)
-
-    def get_u_3d(self, z):
-        """Means of GMM."""
-        z_x = z.size()[0]
-        u_p_x = self.u_p.size()[0]
-        u_p_y = self.u_p.size()[1]
-        u_3d = self.u_p.unsqueeze(0).expand(z_x, u_p_x, u_p_y)
-
-        return(u_3d)
-
-    def get_l_3d(self, z):
-        """Covs of GMM."""
-        z_x = z.size()[0]
-        l_p_x = self.l_p.size()[0]
-        l_p_y = self.l_p.size()[1]
-        l_3d = self.l_p.unsqueeze(0).expand(z_x, l_p_x, l_p_y)
-
-        return(l_3d)
-
-    def get_z_mu_t(self, z_mu):
-        z_mu_x = z_mu.size()[0]
-        z_mu_y = z_mu.size()[1]
-        z_mu_t = z_mu.unsqueeze(2).expand(z_mu_x, z_mu_y, self.n_centroids)
-
-        return(z_mu_t)
-
-    def get_z_lv_t(self, z_lv):
-        z_lv_x = z_lv.size()[0]
-        z_lv_y = z_lv.size()[1]
-        z_lv_t = z_lv.unsqueeze(2).expand(z_lv_x, z_lv_y, self.n_centroids)
-
-        return(z_lv_t)
-
-
-    def get_gamma(self, z, z_mu, z_lv):
-        """
-        z is the latent, z_mean is the mean of the latent, and z_lvar is the
-        log variance of the latent.
-
-        gamma is q_c_x, of which p_c_z estimates (eqn 15).
-        """
-        z_x = z.size()[0]
-        z_y = z.size()[1]
-
-        # NxDxK
-        Z = z.unsqueeze(2).expand(z_x, z_y, self.n_centroids)
-        z_mu_t = self.get_z_mu_t(z_mu)  # Mean of z.
-        z_lv_t = self.get_z_lv_t(z_lv)  # Log variance of z.
-        u_3d = self.get_u_3d(z)  # Means of GMM.
-        l_3d = self.get_l_3d(z)  # Covs of GMM.
-
-        # NxK
-        t_2d = self.get_t_2d(z)  # p(c)
-        p_c_z = torch.exp(torch.log(t_2d) - torch.sum(0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d), dim=1)) + EPS
-        gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
-
-        return(gamma)
-
     def loss(self, recon_x, x, z, z_mu, z_lv):
 
         # NxDxK
-        z_mu_t = self.get_z_mu_t(z_mu)  # Mean of z.
-        z_lv_t = self.get_z_lv_t(z_lv)  # Log variance of z.
-        u_3d = self.get_u_3d(z)  # Means of GMM.
-        l_3d = self.get_l_3d(z)  # Covs of GMM.
+        z_mu_t = self._get_z_mu_t(z_mu)  # Mean of z.
+        z_lv_t = self._get_z_lv_t(z_lv)  # Log variance of z.
+        u_3d = self._get_u_3d(z)  # Means of GMM.
+        l_3d = self._get_l_3d(z)  # Covs of GMM.
 
         # NxK
-        gamma = self.get_gamma(z, z_mu, z_lv)
-        t_2d = self.get_t_2d(z)  # for p(c)
+        gamma = self._get_gamma(z, z_mu, z_lv)
+        t_2d = self._get_t_2d(z)  # for p(c)
 
         # log p(x|z)
         bce = -torch.sum(
@@ -318,19 +326,19 @@ class VaDE(nn.Module):
 
         return(loss)
 
-    def log_marginal_likelihood_estimate(self, x, num_samples):
+    def log_mle(self, x, num_samples):
         weight = torch.zeros(x.size(0))
 
         for i in range(num_samples):
             z, recon_x, mu, logvar = self.forward(x)
-            zloglikelihood = log_likelihood_samples_unit_gaussian(z)
+            log_pz = self._log_pz_samples(z)
 
-            dataloglikelihood = torch.sum(
+            log_px = torch.sum(
                 x*torch.log(torch.clamp(recon_x, min=EPS)) +
                 (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), 1)
 
-            log_qz = log_likelihood_samplesImean_sigma(z, mu, logvar)
-            weight += torch.exp(dataloglikelihood + zloglikelihood - log_qz).data
+            log_qz = self._log_qz_samples(z, mu, logvar)
+            weight += torch.exp(log_px + log_pz - log_qz).data
 
         return(torch.log(torch.clamp(weight/num_samples, min=1e-40)))
 
