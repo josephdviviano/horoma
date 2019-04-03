@@ -106,6 +106,8 @@ venv.bak/
 #Pycharm
 .idea
 
-#data
+#IIC stuff
 *.txt
 *.dat
+IIC/results/*
+
