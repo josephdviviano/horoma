@@ -177,7 +177,7 @@ class VaDE(nn.Module):
         # NxK
         # q(c|x) = p(c|z) = p(c)p(z|c), p(z|c) = normal(z|mu_c, sigma_c)
         # also see eq. 2.192 from Bishop 2006.
-        t_2d = self.get_t_2d(z)
+        t_2d = self._get_t_2d(z)
         p_c = torch.log(t_2d)
         p_z_c = 0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d)
         p_c_z = torch.exp(p_c - torch.sum(p_z_c, dim=1)) + EPS
@@ -304,7 +304,7 @@ class VaDE(nn.Module):
         # log p(x|z)
         bce = -torch.sum(
             x*torch.log(torch.clamp(recon_x, min=EPS)) +
-            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), 1)
+            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
 
         # log p(z|c)
         logpzc = torch.sum(
