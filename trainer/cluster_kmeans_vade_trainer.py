@@ -81,8 +81,9 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
                 z = z[0]
 
             if isinstance(output, tuple):
-                model_loss = self.model.loss(data, *output)
+                model_loss = self.model.loss(*output)
             else:
+                # TODO: This will never be used with VaDE!
                 model_loss = self.model.loss(data, output)
 
             centroids = torch.tensor(self.kmeans.model.cluster_centers_).to(
@@ -135,6 +136,59 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
 
         # We return the model loss for coherence
         return total_model_loss / len(self.train_loader)
+
+
+    def _train_epoch(self, epoch):
+        """
+        Training logic for an epoch
+
+        :param epoch: Current training epoch.
+        :return: the loss for this epoch
+        """
+        self.model.train()
+        total_loss = 0
+
+        self.logger.info('Train Epoch: {}'.format(epoch))
+
+        for batch_idx, (data) in enumerate(self.train_loader):
+            start_it = time()
+            data = data.to(self.device)
+
+            self.optimizer.zero_grad()
+            output = self.model(data)
+            if isinstance(output, tuple):
+                loss = self.model.loss(*output)
+            else:
+                # TODO: This will never be used with VaDE!
+                loss = self.model.loss(data, output)
+            loss.backward()
+            self.optimizer.step()
+
+            step = epoch * len(self.train_loader) + batch_idx
+            self.tb_writer.add_scalar('train/loss', loss.item(), step)
+            # self.comet_writer.log_metric('loss', loss.item(), step)
+
+            total_loss += loss.item()
+
+            end_it = time()
+            time_it = end_it - start_it
+            if batch_idx % self.log_step == 0:
+                self.logger.info(
+                    '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
+                        batch_idx * self.train_loader.batch_size + data.size(
+                            0),
+                        len(self.train_loader.dataset),
+                        100.0 * batch_idx / len(self.train_loader),
+                        time_it * (len(self.train_loader) - batch_idx),
+                        loss.item()))
+                # grid = make_grid(data.cpu(), nrow=8, normalize=True)
+                # self.tb_writer.add_image('input', grid, step)
+
+        self.logger.info('   > Total loss: {:.6f}'.format(
+            total_loss / len(self.train_loader)
+        ))
+
+        return total_loss / len(self.train_loader)
 
     def train(self):
         """
