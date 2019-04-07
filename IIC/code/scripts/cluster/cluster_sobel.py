@@ -124,6 +124,8 @@ if config.restart:
   assert (config.model_ind == given_config.model_ind)
   config.restart = True
   config.restart_from_best = given_config.restart_from_best
+  config.batch_sz = given_config.batch_sz
+  config.dataloader_batch_sz = int(given_config.batch_sz / given_config.num_dataloaders)
 
   # copy over new num_epochs and lr schedule
   config.num_epochs = given_config.num_epochs
