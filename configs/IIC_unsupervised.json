@@ -1,0 +1,49 @@
+{
+    "name": "unsupervised_IIC_overcluster140",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 8,
+    "model": {
+        "type": "IIC_unsupervised",
+        "args": {
+            "gt_k":17,
+            "output_k":140,
+            "num_sub_heads":5
+            }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.0001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 100,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 10,
+        "type": "semi_supervised_IIC_trainer",
+        "options": {
+        }
+    },
+    "data": {
+        "dataset": {
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "flattened": false
+        },
+        "dataloader": {
+            "split": 0.95,
+            "train": {
+                "batch_size": 128,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 128,
+                "shuffle": false
+            }
+        }
+    }
+}

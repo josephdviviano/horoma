@@ -29,18 +29,28 @@ def main(config, resume, test_run=False, helios_run=None, horoma_test=False):
 
     # setup data_loader instances
     if not test_run:
-        unlabelled = HoromaDataset(
-            **config["data"]["dataset"],
+        if config["model"]["type"] = "IIC":
+            unlabelled = IICDataset(
+            data_dir=config["data"]["dataset"]['data_dir'],
+            flattened=False,
             split='train_overlapped',
-            transforms=HoromaTransforms()
-        )
-
-        labelled = HoromaDataset(
+            transforms=HoromaTransforms())
+            labelled = IICDataset(
             data_dir=config["data"]["dataset"]['data_dir'],
             flattened=False,
             split='valid_overlapped',
-            transforms=HoromaTransforms()
-        )
+            transforms=HoromaTransforms())
+            
+        else:
+            unlabelled = HoromaDataset(
+            **config["data"]["dataset"],
+            split='train_overlapped',
+            transforms=HoromaTransforms())
+            labelled = HoromaDataset(
+            data_dir=config["data"]["dataset"]['data_dir'],
+            flattened=False,
+            split='valid_overlapped',
+            transforms=HoromaTransforms())
     elif horoma_test:
 
         unlabelled = HoromaDataset(
@@ -65,21 +75,13 @@ def main(config, resume, test_run=False, helios_run=None, horoma_test=False):
     model = ModelFactory.get(config)
 
     print(model)
-    print()
 
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = OptimizerFactory.get(config, trainable_params)
 
-    trainer = TrainerFactory.get(config)(
-        model,
-        optimizer,
-        resume=resume,
-        config=config,
-        unlabelled=unlabelled,
-        labelled=labelled,
-        helios_run=helios_run,
-        **config['trainer']['options']
-    )
+    trainer = TrainerFactory.get(config)( model, optimizer, resume=resume, config=config, 
+                                        unlabelled=unlabelled, labelled=labelled,
+                                        helios_run=helios_run, **config['trainer']['options'])
 
     trainer.train()
 

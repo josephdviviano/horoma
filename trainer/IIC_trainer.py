@@ -1,170 +1,218 @@
-from __future__ import print_function
+from time import time
 
-import argparse
-import itertools
-import os
-import pickle
-import sys
-from datetime import datetime
-
-import matplotlib
 import numpy as np
+from torch.utils.data import DataLoader
+
+from utils.dataset import SplitDataset
+from trainer.basetrainer import BaseTrainer
+from time import time
+
+import numpy as np
+from sklearn.cluster import KMeans
 import torch
+from torch.nn import functional
 
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+from trainer.trainer import Trainer
 
-import code.archs as archs
-from code.utils.cluster.general import config_to_str, get_opt, update_lr, nice
-from code.utils.cluster.transforms import sobel_process
-from code.utils.cluster.cluster_eval import cluster_eval
-from code.utils.cluster.data import cluster_twohead_create_dataloaders
-from code.utils.cluster.IID_losses import IID_loss
 
-"""
-  Fully unsupervised clustering ("IIC" = "IID").
-  Train and test script (coloured datasets).
-  Network has two heads, for overclustering and final clustering.
-"""
+class IIC_unsupervised(BaseTrainer):
+      
+    def __init__(self, model, optimizer, resume, config, unlabelled, labelled, helios_run, 
+                  experiment_folder=None, n_clusters=20, kmeans_interval=0, kmeans_headstart=0, kmeans_weight=1):
 
-# Options ----------------------------------------------------------------------
+        super(IIC_unsupervised, self).__init__(self, model, optimizer, resume, config, unlabelled, labelled,
+                 helios_run, experiment_folder=None):
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--model_ind", type=int, required=True)
-parser.add_argument("--arch", type=str, required=True)
-parser.add_argument("--opt", type=str, default="Adam")
-parser.add_argument("--mode", type=str, default="IID")
+        self.kmeans = KMeans(n_clusters=n_clusters)
+        self.kmeans_interval = kmeans_interval
+        self.kmeans_headstart = kmeans_headstart
+        self.kmeans_weight = kmeans_weight
 
-parser.add_argument("--dataset", type=str, required=True)
-parser.add_argument("--dataset_root", type=str, required=True)
+        ############################################
+        #    Splitting into training/validation    #
+        ############################################
 
-parser.add_argument("--gt_k", type=int, required=True)
-parser.add_argument("--output_k_A", type=int, required=True)
-parser.add_argument("--output_k_B", type=int, required=True)
+        # Splitting 9:1 by default
+        split = config['data']['dataloader'].get('split', .9)
 
-parser.add_argument("--lamb", type=float, default=1.0)
-parser.add_argument("--lr", type=float, default=0.01)
-parser.add_argument("--lr_schedule", type=int, nargs="+", default=[])
-parser.add_argument("--lr_mult", type=float, default=0.1)
+        splitter = SplitDataset(split)
 
-parser.add_argument("--num_epochs", type=int, default=1000)
-parser.add_argument("--batch_sz", type=int, required=True)  # num pairs
-parser.add_argument("--num_dataloaders", type=int, default=3)
-parser.add_argument("--num_sub_heads", type=int, default=5)  # per head...
+        train_set, valid_set = splitter(unlabelled)
 
-parser.add_argument("--out_root", type=str,
-                    default="./results/")
-parser.add_argument("--restart", dest="restart", default=False,
-                    action="store_true")
-parser.add_argument("--restart_from_best", dest="restart_from_best",
-                    default=False, action="store_true")
-parser.add_argument("--test_code", dest="test_code", default=False,
-                    action="store_true")
+        ############################################
+        #  Creating the corresponding dataloaders  #
+        ############################################
 
-parser.add_argument("--stl_leave_out_unlabelled", default=False,
-                    action="store_true")
+        train_loader = DataLoader(
+            dataset=train_set,
+            **config['data']['dataloader']['train'],
+            pin_memory=True
+        )
 
-parser.add_argument("--save_freq", type=int, default=10)
+        valid_loader = DataLoader(
+            dataset=valid_set,
+            **config['data']['dataloader']['valid'],
+            pin_memory=True
+        )
 
-parser.add_argument("--double_eval", default=False, action="store_true")
+        print(
+            '>> Total batch number for training: {}'.format(len(train_loader)))
+        print('>> Total batch number for validation: {}'.format(
+            len(valid_loader)))
+        print()
 
-parser.add_argument("--head_A_first", default=False, action="store_true")
-parser.add_argument("--head_A_epochs", type=int, default=1)
-parser.add_argument("--head_B_epochs", type=int, default=1)
+        self.train_loader = train_loader
+        self.valid_loader = valid_loader
+        self.log_step = int(np.sqrt(len(train_loader)))
 
-parser.add_argument("--batchnorm_track", default=False, action="store_true")
+        self.kmeans = KMeans(n_clusters=n_clusters)
+        self.kmeans_interval = kmeans_interval
+        self.kmeans_headstart = kmeans_headstart
+        self.kmeans_weight = kmeans_weight
 
-# transforms
-parser.add_argument("--mix_train", dest="mix_train", default=False,
-                    action="store_true")
-parser.add_argument("--include_rgb", dest="include_rgb", default=False,
-                    action="store_true")
+    def _fit_kmeans(self):
+        """
+        Train the kmeans.
 
-parser.add_argument("--demean", dest="demean", default=False,
-                    action="store_true")
-parser.add_argument("--per_img_demean", dest="per_img_demean", default=False,
-                    action="store_true")
-parser.add_argument("--data_mean", type=float, nargs="+", default=[])
-parser.add_argument("--data_std", type=float, nargs="+", default=[])
+        :return:
+        """
+        embeddings = []
 
-parser.add_argument("--crop_orig", dest="crop_orig", default=False,
-                    action="store_true")
-parser.add_argument("--rand_crop_sz", type=int, default=84)
-parser.add_argument("--input_sz", type=int, default=96)
+        self.model.eval()
 
-parser.add_argument("--fluid_warp", dest="fluid_warp", default=False,
-                    action="store_true")
-parser.add_argument("--rand_crop_szs_tf", type=int, nargs="+",
-                    default=[])  # only used if fluid warp true
-parser.add_argument("--rot_val", type=float,
-                    default=0.)  # only used if fluid warp true
+        with torch.no_grad():
+            for batch_idx, (data) in enumerate(self.train_loader):
+                data = data.to(self.device)
 
-parser.add_argument("--cutout", default=False, action="store_true")
-parser.add_argument("--cutout_p", type=float, default=0.5)
-parser.add_argument("--cutout_max_box", type=float, default=0.5)
+                z = self.model.encode(data).cpu()
 
-config = parser.parse_args()
+                embeddings.append(z.detach().numpy())
 
-# Setup ------------------------------------------------------------------------
+            embeddings = np.concatenate(embeddings)
 
-config.twohead = True
+            self.kmeans.fit(embeddings)
 
-if not config.include_rgb:
-  config.in_channels = 2
-else:
-  config.in_channels = 5
+    def _train_epoch_kmeans(self, epoch):
+        """
+        Add the distance to the centroid in the loss.
 
-config.out_dir = os.path.join(config.out_root, str(config.model_ind))
-assert (config.batch_sz % config.num_dataloaders == 0)
-config.dataloader_batch_sz = int(config.batch_sz / config.num_dataloaders)
+        :param epoch: Current training epoch.
+        :return: the loss for this epoch
+        """
 
-assert (config.mode == "IID")
-assert ("TwoHead" in config.arch)
-assert (config.output_k_B == config.gt_k)
-config.output_k = config.output_k_B  # for eval code
-assert (config.output_k_A >= config.gt_k)
+        self._fit_kmeans()
 
-config.eval_mode = "hung"
+        self.model.train()
 
-if not os.path.exists(config.out_dir):
-  os.makedirs(config.out_dir)
+        total_loss = 0
+        total_kmeans_loss = 0
+        total_model_loss = 0
 
-if config.restart:
-  config_name = "config.pickle"
-  net_name = "latest_net.pytorch"
-  opt_name = "latest_optimiser.pytorch"
+        self.logger.info('K-Means Train Epoch: {}'.format(epoch))
 
-  if config.restart_from_best:
-    config_name = "best_config.pickle"
-    net_name = "best_net.pytorch"
-    opt_name = "best_optimiser.pytorch"
+        for batch_idx, (data) in enumerate(self.train_loader):
+            start_it = time()
+            data = data.to(self.device)
 
-  given_config = config
-  reloaded_config_path = os.path.join(given_config.out_dir, config_name)
-  print("Loading restarting config from: %s" % reloaded_config_path)
-  with open(reloaded_config_path, "rb") as config_f:
-    config = pickle.load(config_f)
-  assert (config.model_ind == given_config.model_ind)
-  config.restart = True
-  config.restart_from_best = given_config.restart_from_best
+            self.optimizer.zero_grad()
 
-  # copy over new num_epochs and lr schedule
-  config.num_epochs = given_config.num_epochs
-  config.lr_schedule = given_config.lr_schedule
+            output = self.model(data)
+            z = self.model.encode(data)
 
-  if not hasattr(config, "cutout"):
-    config.cutout = False
-    config.cutout_p = 0.5
-    config.cutout_max_box = 0.5
+            if isinstance(output, tuple):
+                model_loss = self.model.loss(data, *output)
+            else:
+                model_loss = self.model.loss(data, output)
 
-  if not hasattr(config, "batchnorm_track"):
-    config.batchnorm_track = True  # before we added in false option
+            centroids = torch.tensor(self.kmeans.cluster_centers_).to(
+                self.device)
+            clusters = torch.tensor(self.kmeans.predict(z.cpu().detach()),
+                                    dtype=torch.long).to(self.device)
 
-else:
-  print("Config: %s" % config_to_str(config))
+            closest_centroids = torch.index_select(centroids, 0, clusters)
 
-# Model ------------------------------------------------------------------------
+            kmeans_loss = functional.mse_loss(z, closest_centroids)
 
+            loss = model_loss + kmeans_loss * self.kmeans_weight
+
+            loss.backward()
+            self.optimizer.step()
+
+            step = epoch * len(self.train_loader) + batch_idx
+            self.tb_writer.add_scalar('train/loss', loss.item(), step)
+
+            total_loss += loss.item()
+            total_kmeans_loss += kmeans_loss.item()
+            total_model_loss += model_loss.item()
+
+            end_it = time()
+            time_it = end_it - start_it
+            if batch_idx % self.log_step == 0:
+                self.logger.info(
+                    '   > [{}/{} ({:.0f}%), {:.2f}s] '
+                    'Loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})'.format(
+                        batch_idx * self.train_loader.batch_size + data.size(
+                            0),
+                        len(self.train_loader.dataset),
+                        100.0 * batch_idx / len(self.train_loader),
+                        time_it * (len(self.train_loader) - batch_idx),
+                        loss.item(),
+                        model_loss.item(),
+                        kmeans_loss.item(),
+                        self.kmeans_weight
+                    ))
+                # grid = make_grid(data.cpu(), nrow=8, normalize=True)
+                # self.tb_writer.add_image('input', grid, step)
+
+        self.logger.info(
+            '   > Total loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})'.format(
+                total_loss / len(self.train_loader),
+                total_model_loss / len(self.train_loader),
+                total_kmeans_loss / len(self.train_loader),
+                self.kmeans_weight
+            ))
+
+        # We return the model loss for coherence
+        return total_model_loss / len(self.train_loader)
+
+    def train(self):
+        """
+        Full training logic for the kmeanstrainer
+        """
+
+        t0 = time()
+
+        for epoch in range(self.start_epoch, self.epochs):
+
+            if epoch % (
+                    self.kmeans_interval + 1) == 0 \
+                    and epoch >= self.kmeans_headstart:
+                train_loss = self._train_epoch_kmeans(epoch)
+            else:
+                train_loss = self._train_epoch(epoch)
+
+            valid_loss = self._valid_epoch(epoch)
+
+            self.tb_writer.add_scalar("train/epoch_loss", train_loss,
+                                      epoch)
+            self.tb_writer.add_scalar("valid/epoch_loss", valid_loss,
+                                      epoch)
+
+            self._save_checkpoint(epoch, train_loss, valid_loss)
+
+            time_elapsed = time() - t0
+
+            # Break the loop if there is no more time left
+            if time_elapsed * (1 + 1 / (
+                    epoch - self.start_epoch + 1)) > .95 \
+                    * self.wall_time * 3600:
+                break
+
+        # Save the checkpoint if it's not already done.
+        if not epoch % self.save_period == 0:
+            self._save_checkpoint(epoch, train_loss, valid_loss)
+
+        
 dataloaders_head_A, dataloaders_head_B, mapping_assignment_dataloader, \
 mapping_test_dataloader = cluster_twohead_create_dataloaders(config)
 
@@ -451,3 +499,50 @@ for e_i in range(next_epoch, config.num_epochs):
 
   if config.test_code:
     exit(0)
+
+    def _valid_epoch(self, epoch):
+        """
+        Validation logic for an epoch
+
+        :param epoch: Current training epoch.
+        :return: the loss for this epoch
+        """
+        self.model.eval()
+        total_loss = 0
+
+        self.logger.info('Valid Epoch: {}'.format(epoch))
+
+        for batch_idx, (data) in enumerate(self.valid_loader):
+            start_it = time()
+            data = data.to(self.device)
+
+            output = self.model(data)
+            if isinstance(output, tuple):
+                loss = self.model.loss(data, *output)
+            else:
+                loss = self.model.loss(data, output)
+
+            step = epoch * len(self.valid_loader) + batch_idx
+            self.tb_writer.add_scalar('valid/loss', loss.item(), step)
+
+            total_loss += loss.item()
+
+            end_it = time()
+            time_it = end_it - start_it
+            if batch_idx % self.log_step == 0:
+                self.logger.info(
+                    '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
+                        batch_idx * self.valid_loader.batch_size + data.size(
+                            0),
+                        len(self.valid_loader.dataset),
+                        100.0 * batch_idx / len(self.valid_loader),
+                        time_it * (len(self.valid_loader) - batch_idx),
+                        loss.item()))
+                # grid = make_grid(data.cpu(), nrow=8, normalize=True)
+                # self.tb_writer.add_image('input', grid, step)
+
+        self.logger.info('   > Total loss: {:.6f}'.format(
+            total_loss / len(self.valid_loader)
+        ))
+
+        return total_loss / len(self.valid_loader)
