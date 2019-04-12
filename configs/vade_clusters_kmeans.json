@@ -3,7 +3,7 @@
     "n_gpu": 1,
     "numpy_seed": 1,
     "torch_seed": 1,
-    "wall_time": 8,
+    "wall_time": 2,
     "model": {
         "type": "VaDE",
         "args": {

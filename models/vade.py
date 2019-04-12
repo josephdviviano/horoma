@@ -116,7 +116,7 @@ class VaDE(nn.Module):
         return(out)
 
     def _get_t_2d(self, z):
-        """Gaussian weights for z. TODO: currently all identical."""
+        """Gaussian weights for z. TODO: currently shrinks to zero."""
         z_x = z.size()[0]
         t_2d = self.t_p.unsqueeze(0).expand(z_x, self.n_centroids)
 
@@ -181,6 +181,7 @@ class VaDE(nn.Module):
         p_c = torch.log(t_2d)
         p_z_c = 0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d)
         p_c_z = torch.exp(p_c - torch.sum(p_z_c, dim=1)) + EPS
+
         gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
 
         return(gamma)
@@ -194,22 +195,23 @@ class VaDE(nn.Module):
         return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
             0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
 
-
     def create_gmm_param(self):
         """
         t_p = Probability of each gaussian (all equal for now)
         u_p = Means of GMM
         l_p = Covariances of GMM.
         """
-
         # TODO: Differen't weights for each Gaussian?
-        self.t_p = nn.Parameter(torch.ones(self.n_centroids)/self.n_centroids)
+        self.t_p = nn.Parameter(torch.ones(
+            self.n_centroids)/self.n_centroids, requires_grad=False)
 
         # Means of GMM
-        self.u_p = nn.Parameter(torch.zeros(self.z_dim, self.n_centroids))
+        self.u_p = nn.Parameter(torch.zeros(
+            self.z_dim, self.n_centroids), requires_grad=False)
 
         # Covariances of GMM
-        self.l_p = nn.Parameter(torch.ones(self.z_dim, self.n_centroids))
+        self.l_p = nn.Parameter(torch.ones(
+            self.z_dim, self.n_centroids), requires_grad=False)
 
     def initialize_gmm(self, dataloader):
         """
@@ -322,6 +324,13 @@ class VaDE(nn.Module):
         logqcx = torch.sum(torch.log(gamma)*gamma, 1)
 
         # Normalise by same number of elements as in reconstruction.
+        print("bce={}, gammma={}, logpzc={}, qentropy={}, logpc={}, logqcx={}".format(
+            torch.mean(bce),
+            torch.mean(gamma),
+            torch.mean(logpzc),
+            torch.mean(qentropy),
+            torch.mean(logpc),
+            torch.mean(logqcx)))
         loss = torch.mean(bce + logpzc + qentropy + logpc + logqcx)
 
         return(loss)

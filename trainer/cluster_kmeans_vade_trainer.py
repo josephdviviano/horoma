@@ -190,6 +190,75 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
 
         return total_loss / len(self.train_loader)
 
+    def _valid_epoch_model_loss(self, epoch):
+        """
+        Validation logic for an epoch
+
+        :param epoch: Current training epoch.
+        :return: the loss for this epoch
+        """
+        self.model.eval()
+        total_loss = 0
+
+        self.logger.info('Valid Epoch: {}'.format(epoch))
+
+        for batch_idx, (data) in enumerate(self.valid_loader):
+            start_it = time()
+            data = data.to(self.device)
+
+            output = self.model(data)
+            if isinstance(output, tuple):
+                loss = self.model.loss(*output)
+            else:
+                # TODO: This will never be used with VaDE!
+                loss = self.model.loss(data, output)
+
+            step = epoch * len(self.valid_loader) + batch_idx
+            self.tb_writer.add_scalar('valid/loss', loss.item(), step)
+
+            total_loss += loss.item()
+
+            end_it = time()
+            time_it = end_it - start_it
+            if batch_idx % self.log_step == 0:
+                self.logger.info(
+                    '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
+                        batch_idx * self.valid_loader.batch_size + data.size(
+                            0),
+                        len(self.valid_loader.dataset),
+                        100.0 * batch_idx / len(self.valid_loader),
+                        time_it * (len(self.valid_loader) - batch_idx),
+                        loss.item()))
+                # grid = make_grid(data.cpu(), nrow=8, normalize=True)
+                # self.tb_writer.add_image('input', grid, step)
+
+        self.logger.info('   > Total loss: {:.6f}'.format(
+            total_loss / len(self.valid_loader)
+        ))
+
+        return(total_loss / len(self.valid_loader))
+
+    def _valid_epoch(self, epoch):
+        """
+        Validation logic for an epoch
+
+        :param epoch: Current training epoch.
+        :return: the loss for this epoch
+        """
+        # Get standard loss.
+        loss = self._valid_epoch_model_loss(epoch)
+
+        # Get loss from cluster centroid distances.
+        self.cluster_collection.full_fit()
+        other_metrics = self.cluster_collection.get_clustering_metrics()
+
+        for key, value in other_metrics.items():
+            model, metric = key.split('-')
+            self.tb_writer.add_scalar('{}/{}'.format(model, metric), value,
+                                      epoch)
+
+        return(loss, other_metrics)
+
     def train(self):
         """
         Full training logic for the cluster trainer.
@@ -214,11 +283,8 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
 
             valid_loss, other_metrics = self._valid_epoch(epoch)
 
-            self.tb_writer.add_scalar("train/epoch_loss", train_loss,
-                                      epoch)
-            self.tb_writer.add_scalar("valid/epoch_loss", valid_loss,
-                                      epoch)
-
+            self.tb_writer.add_scalar("train/epoch_loss", train_loss, epoch)
+            self.tb_writer.add_scalar("valid/epoch_loss", valid_loss, epoch)
             self._save_checkpoint(epoch, train_loss, valid_loss, other_metrics)
 
             time_elapsed = time() - t0
