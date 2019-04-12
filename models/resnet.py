@@ -13,19 +13,6 @@ class ResNet18(ResNet):
         self.fc = nn.Linear(512, num_classes)
         self.crossentropy = CrossEntropyLoss()
 
-    def forward(self, x):
-        """
-        Performs the forward pass:
-        * encoding from the original space into the latent representation ;
-        * reconstruction with loss in the original space.
-
-        :param x: image to reconstruct
-        :return: image reconstruted
-        """
-        x = self.forward(x)
-
-        return x
-
     def loss(self, x, label):
         """
         Loss logic for the Vanilla AE.
