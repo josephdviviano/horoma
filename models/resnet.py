@@ -10,6 +10,11 @@ class ResNet18(ResNet):
     def __init__(self, num_classes=17):
         super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2])
         self.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+
+        # Freeze dem weights.
+        for param in self.parameters():
+            param.requires_grad = False
+
         self.fc = nn.Linear(512, num_classes)
         self.crossentropy = CrossEntropyLoss()
 

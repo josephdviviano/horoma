@@ -8,7 +8,7 @@ import numpy as np
 from utils.dataset import HoromaDataset
 from utils.mnist_dataset import CustomMNIST
 from utils.factories import ModelFactory, OptimizerFactory, TrainerFactory
-from utils.transforms import HoromaTransforms
+from utils.transforms import HoromaTransforms, HoromaTransformsResNet
 from utils.mnist_dataset import CustomLabelledMNIST
 
 
@@ -27,34 +27,36 @@ def main(config, resume, test_run=False, helios_run=None, horoma_test=False):
     torch.manual_seed(config["torch_seed"])
     torch.cuda.manual_seed_all(config["torch_seed"])
 
+    TRANSFORMS = HoromaTransforms()
+
     # setup data_loader instances
     if not test_run:
         unlabelled = HoromaDataset(
             **config["data"]["dataset"],
             split='train_overlapped',
-            transforms=HoromaTransforms()
+            transforms=TRANSFORMS
         )
 
         labelled = HoromaDataset(
             data_dir=config["data"]["dataset"]['data_dir'],
             flattened=False,
-            split='valid_overlapped',
-            transforms=HoromaTransforms()
+            split='full_labeled_overlapped',
+            transforms=TRANSFORMS
         )
     elif horoma_test:
 
         unlabelled = HoromaDataset(
             **config["data"]["dataset"],
             split='train_overlapped',
-            transforms=HoromaTransforms(),
+            transforms=TRANSFORMS,
             subset=5000
         )
 
         labelled = HoromaDataset(
             data_dir=config["data"]["dataset"]['data_dir'],
             flattened=False,
-            split='valid_overlapped',
-            transforms=HoromaTransforms(),
+            split='full_labeled_overlapped',
+            transforms=TRANSFORMS,
             subset=1000
         )
     else:

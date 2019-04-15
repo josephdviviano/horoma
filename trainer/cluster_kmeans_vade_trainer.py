@@ -263,10 +263,26 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         """
         Full training logic for the cluster trainer.
         """
-
         t0 = time()
 
-        # We need to construct the embeddings
+        # 5 epochs of pre-training
+        pretrain_criterion = torch.nn.MSELoss()
+
+        self.model.train()
+        self.model.set_mode("pretrain")
+        for epoch in range(5):
+            print('pretrain epoch {}'.format(epoch))
+            for batch_idx, data in enumerate(self.train_loader):
+
+                data = data.to(self.device)
+                data_recon = self.model.pretrain(data)
+                loss = pretrain_criterion(data, data_recon)
+                loss.backward()
+                self.optimizer.step()
+
+        self.model.set_mode("train")
+
+        # Construct the embeddings.
         self.cluster_collection.cluster_helper.build_embeddings()
 
         # Initialize the GMM.

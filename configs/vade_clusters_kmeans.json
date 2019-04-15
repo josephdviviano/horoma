@@ -7,9 +7,9 @@
     "model": {
         "type": "VaDE",
         "args": {
-            "z_dim": 10,
-            "n_centroids": 10,
-            "binary": true,
+            "z_dim": 5,
+            "n_centroids": 100,
+            "binary": false,
             "cnn_kernel_size": 5,
             "cnn1_out_channels": 10,
             "cnn2_out_channels": 20,
@@ -21,8 +21,8 @@
     "optimizer": {
         "type": "Adam",
         "args":{
-            "lr": 0.0001,
-            "weight_decay": 0,
+            "lr": 0.001,
+            "weight_decay": 0.0001,
             "amsgrad": false
         }
     },
@@ -36,12 +36,12 @@
             "n_clusters": 100,
             "kmeans_interval": 0,
             "kmeans_headstart": 0,
-            "kmeans_weight": 10.0
+            "kmeans_weight": 1000.0
         }
     },
     "data": {
         "dataset": {
-            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2/data",
             "flattened": false
         },
         "dataloader": {

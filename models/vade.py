@@ -88,14 +88,38 @@ class VaDE(nn.Module):
                       IMAGE_SIZE * INPUT_CHANNELS)
         )
 
+        # for VAE
         self._enc_mu = nn.Linear(lin2_in_channels, z_dim)
         self._enc_log_sigma = nn.Linear(lin2_in_channels, z_dim)
+
+        # for pre-train only
+        self._pre_in = nn.Linear(lin2_in_channels, z_dim)
+
+        # defaut to pretrain mode.
+        self.set_mode("pretrain")
+
+        # Acivation fxn on decoder default state.
         self._dec_act = None
 
         if binary:
             self._dec_act = nn.Sigmoid()
 
         self.create_gmm_param()
+
+    def set_mode(self, setting):
+        """Used by forward to determine what to do with the data."""
+        assert setting in ["pretrain", "train"]
+
+        self.mode = setting
+
+        if setting == "pretrain":
+            self._enc_mu.requires_grad = False
+            self._enc_log_sigma.requires_grad = False
+            self._pre_in.requires_grad = True
+        elif setting == "train":
+            self._enc_mu.requires_grad = True
+            self._enc_log_sigma.requires_grad = True
+            self._pre_in.requires_grad = False
 
     def _calc_output_size(self, width, kernel, pad, stride, pool,
                           level=1, n_levels=1):
@@ -261,12 +285,19 @@ class VaDE(nn.Module):
 
     def forward(self, x):
         """
+        If mode is train:
         Return the latent, mu, logvar, and reconstruction for a minibatch.
-        """
-        z, mu, logvar = self.encode(x)
-        x_recon = self.decode(z)
 
-        return(x_recon, x, z, mu, logvar)
+        Elif mode is pretrain:
+        Return a reconstruction from a normal-style autoencoder.
+        """
+        if self.mode == "train":
+            z, mu, logvar = self.encode(x)
+            x_recon = self.decode(z)
+            return(x_recon, x, z, mu, logvar)
+        elif self.mode == "pretrain":
+            x_recon = self.pretrain(x)
+            return(x_recon)
 
     def encode(self, x):
         """Encode x into latent z."""
@@ -288,6 +319,16 @@ class VaDE(nn.Module):
             x_recon = self._dec_act(x_recon)
 
         x_recon = x_recon.view((z.size(0), INPUT_CHANNELS, IMAGE_H, IMAGE_W))
+
+        return(x_recon)
+
+    def pretrain(self, x):
+        """Does encoder-decoder in the style of a standard AE."""
+        hid = self.encoder_cnn(x)
+        hid = hid.view([hid.size(0), -1])
+        hid = self.encoder_mlp(hid)
+        z = self._pre_in(hid)
+        x_recon = self.decode(z)
 
         return(x_recon)
 
