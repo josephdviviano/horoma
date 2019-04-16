@@ -217,7 +217,7 @@ def main():
         data_dir=args.data_dir,
         split="train",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
-        flattened=True,
+        # flattened=True,
         # subset=1,
     )
 
@@ -226,7 +226,7 @@ def main():
         data_dir=args.data_dir,
         split="full_labeled",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
-        flattened=True,
+        # flattened=True,
     )
     splitter = horoma_dataset.SplitDataset(split=0.8)
     train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
@@ -242,7 +242,26 @@ def main():
         workers=args.workers,
     )
 
-    input_size = 3072
+    # -------------- model params for 1d model --------------
+    # input_channels = 1
+    # target_labels = targets.split(",")
+    # target_labels = [s.lower().strip() for s in target_labels]
+    # if len(target_labels) == 1:
+    #     out_size = target_out_size_dict[target_labels[0]]
+    # else:
+    #     out_size = [target_out_size_dict[a] for a in target_labels]
+    # n_layers = 0  # hyper-parameter
+    # hidden_size = 256  # hyper-parameter # 128
+    # kernel_size = 8  # for CNN1D only
+    # pool_size = 4  # for CNN1D only
+    # dropout = 0.2
+    # n_heads = 8  # 4
+    # key_dim = 128
+    # val_dim = 128
+    # inner_dim = 128
+
+    # -------------- model params for 2d model --------------
+    input_channels = 3
     target_labels = targets.split(",")
     target_labels = [s.lower().strip() for s in target_labels]
     if len(target_labels) == 1:
@@ -251,16 +270,17 @@ def main():
         out_size = [target_out_size_dict[a] for a in target_labels]
     n_layers = 0  # hyper-parameter
     hidden_size = 256  # hyper-parameter # 128
-    kernel_size = 8  # for CNN1D only
-    pool_size = 4  # for CNN1D only
+    kernel_size = 2  # for CNN1D only
+    pool_size = 2  # for CNN1D only
     dropout = 0.2
     n_heads = 8  # 4
     key_dim = 128
     val_dim = 128
     inner_dim = 128
 
-    model = models.TransformerNet(
-        1,
+    # model = models.TransformerNet( # 1d model
+    model = models.TransformerNet2D( # 2d model
+        input_channels,
         out_size,
         hidden_size,
         n_layers,

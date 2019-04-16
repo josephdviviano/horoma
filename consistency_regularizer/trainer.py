@@ -140,8 +140,6 @@ class Trainer:
                 writer.add_scalar("Valid/f1_score", val_metrics[0], tbIndex)
                 writer.add_scalar("Train_perf/accuracy", perfs[1].avg, tbIndex)
                 writer.add_scalar("Valid/accuracy", val_metrics[1], tbIndex)
-                writer.add_scalar("Train_perf/recall", perfs[2].avg, tbIndex)
-                writer.add_scalar("Valid/recall", val_metrics[2], tbIndex)
 
                 train_metrics_avg = [p.avg for p in perfs]
                 train_metrics_val = [p.val for p in perfs]

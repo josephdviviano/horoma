@@ -17,7 +17,7 @@ class Conv1DLinear(nn.Module):
         self.preprocess = pp.Preprocessor()
         self.conv1 = nn.Conv1d(input_size, hidden_size, kernel_size)
         # size of output
-        lout = 3750 - kernel_size + 1
+        lout = 3072 - kernel_size + 1
         self.pool1 = nn.MaxPool1d(pool_size)
         lout = math.floor(lout / pool_size)
         self.conv2 = nn.Conv1d(hidden_size, hidden_size, kernel_size)
@@ -63,7 +63,7 @@ class Conv1DBNLinear(nn.Module):
         self.preprocess = pp.Preprocessor()
         self.batch_norm0 = nn.BatchNorm1d(input_size)
 
-        lout = 3750
+        lout = 3072
 
         self.conv1 = nn.Conv1d(input_size, hidden_size, kernel_size)
         lout = self.l_out_conv1D(lout, kernel_size)
@@ -186,14 +186,13 @@ class TransformerNet(nn.Module):
                  val_dim=None,
                  inner_dim=None,
                  dropout=0.1
-
                  ):
         super(TransformerNet, self).__init__()
         # self.preprocess = pp.Preprocessor()
 
         self.conv1 = nn.Conv1d(input_size, hidden_size, kernel_size)
         # size of output
-        lout = self.l_out_conv1d(3750, kernel_size)
+        lout = self.l_out_conv1d(3072, kernel_size)
         self.pool1 = nn.MaxPool1d(pool_size)
         lout = self.l_out_maxpool1d(lout, pool_size)
         self.conv2 = nn.Conv1d(hidden_size, hidden_size, kernel_size)
@@ -280,7 +279,7 @@ class TransformerNet(nn.Module):
 
         return pred
 
-"""
+
 class TransformerNet2D(nn.Module):
 
     def __init__(self,
@@ -295,26 +294,26 @@ class TransformerNet2D(nn.Module):
                  val_dim=None,
                  inner_dim=None,
                  dropout=0.1
-
                  ):
-        super(TransformerNet, self).__init__()
+        super(TransformerNet2D, self).__init__()
         # self.preprocess = pp.Preprocessor()
 
         self.conv1 = nn.Conv2d(input_size, hidden_size, kernel_size)
         # size of output
-        lout = self.l_out_conv1d(3750, kernel_size)
-        self.pool1 = nn.MaxPool1d(pool_size)
-        lout = self.l_out_maxpool1d(lout, pool_size)
-        self.conv2 = nn.Conv1d(hidden_size, hidden_size, kernel_size)
-        lout = self.l_out_conv1d(lout, kernel_size)
-        self.pool2 = nn.MaxPool1d(pool_size)
-        lout = self.l_out_maxpool1d(lout, pool_size)
-        self.conv3 = nn.Conv1d(hidden_size, hidden_size, kernel_size)
-        lout = self.l_out_conv1d(lout, kernel_size)
-        self.pool3 = nn.MaxPool1d(pool_size)
-        lout = self.l_out_maxpool1d(lout, pool_size)
+        lout = self.l_out_conv2d(32, kernel_size)
+        self.pool1 = nn.MaxPool2d(pool_size)
+        lout = self.l_out_maxpool2d(lout, pool_size)
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size)
+        lout = self.l_out_conv2d(lout, kernel_size)
+        self.pool2 = nn.MaxPool2d(pool_size)
+        lout = self.l_out_maxpool2d(lout, pool_size)
+        self.conv3 = nn.Conv2d(hidden_size, hidden_size, kernel_size)
+        lout = self.l_out_conv2d(lout, kernel_size)
+        self.pool3 = nn.MaxPool2d(pool_size)
+        lout = self.l_out_maxpool2d(lout, pool_size)
 
         print('lout: ', lout)
+        self.lout = lout
 
         self.nl = nn.ReLU()
 
@@ -352,16 +351,16 @@ class TransformerNet2D(nn.Module):
         else:
             self.out = nn.ModuleList(output_modules)
 
-    def l_out_conv1d(self, l_in, kernel_size, stride=1, padding=0, dilation=1):
+    def l_out_conv2d(self, l_in, kernel_size, stride=1, padding=0, dilation=1):
         l_out = (l_in + (2 * padding) - dilation *
                  (kernel_size - 1) - 1) / stride
         l_out = l_out + 1
         return int(l_out)
 
-    def l_out_maxpool1d(self, l_in, kernel_size, stride=None, padding=0, dilation=1):
+    def l_out_maxpool2d(self, l_in, kernel_size, stride=None, padding=0, dilation=1):
         if stride is None:
             stride = kernel_size
-        l_out = self.l_out_conv1d(
+        l_out = self.l_out_conv2d(
             l_in, kernel_size, stride, padding, dilation
         )
         return l_out
@@ -374,6 +373,8 @@ class TransformerNet2D(nn.Module):
         x = self.nl(self.pool1(self.conv1(x)))
         x = self.nl(self.pool2(self.conv2(x)))
         x = self.nl(self.pool3(self.conv3(x)))
+
+        x = x.view(x.shape[0], x.shape[1], self.lout*self.lout)
 
         data = x.permute(0, 2, 1)
 
@@ -388,4 +389,3 @@ class TransformerNet2D(nn.Module):
             pred = self.out(data)
 
         return pred
-"""
