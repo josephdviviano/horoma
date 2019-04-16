@@ -38,16 +38,18 @@ class VaDE(nn.Module):
                  lin2_in_channels=50, maxpool_kernel=2, dropout=0.1):
         super(self.__class__, self).__init__()
 
+        # Save settings for later.
         self.z_dim = z_dim
         self.n_centroids = n_centroids
         self.dropout = nn.Dropout(dropout)
         self.activation = nn.SELU()
-        self.maxpool = nn.MaxPool2d(maxpool_kernel)
+        self.maxpool = nn.MaxPool2d(maxpool_kernel, return_indices=True)
+        self.cnn2_out_channels = cnn2_out_channels
 
         # Architecture copied from best performing model, conv_ae.py
-        last_w = self._calc_output_size(
+        self.last_w = self._calc_output_size(
             IMAGE_W, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
-        last_h = self._calc_output_size(
+        self.last_h = self._calc_output_size(
             IMAGE_H, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
 
         self.encoder_cnn = nn.Sequential(
@@ -55,50 +57,57 @@ class VaDE(nn.Module):
             self.maxpool,
             self.activation,
             self.dropout,
-            nn.Conv2d(cnn1_out_channels, cnn2_out_channels, cnn_kernel_size),
+            nn.Conv2d(cnn1_out_channels, self.cnn2_out_channels, cnn_kernel_size),
             self.maxpool,
             self.activation,
             self.dropout
         )
 
         self.encoder_mlp = nn.Sequential(
-            nn.Linear(cnn2_out_channels * last_w * last_h, lin2_in_channels),
+            nn.Linear(
+                self.cnn2_out_channels * self.last_w * self.last_h, lin2_in_channels),
             self.activation,
             self.dropout
-        )
-
-        self.decoder = nn.Sequential(
-            nn.Linear(self.z_dim, cnn2_out_channels * last_w * last_h),
-            self.activation,
-            nn.Linear(cnn2_out_channels * last_w * last_h,
-                      IMAGE_SIZE * INPUT_CHANNELS)
         )
 
         # Encoding to the prior.
         self._enc_mu = nn.Linear(lin2_in_channels, z_dim)
         self._enc_log_sigma = nn.Linear(lin2_in_channels, z_dim)
 
+        self.decoder_mlp = nn.Sequential(
+            nn.Linear(z_dim, lin2_in_channels),
+            self.activation,
+            self.dropout,
+            nn.Linear(
+                lin2_in_channels, self.cnn2_out_channels * self.last_w * self.last_h),
+            self.activation,
+            self.dropout
+        )
+
+        # Transposed convolutions for decoder.
+        self.decoder_cnn = nn.Sequential(
+            nn.MaxUnpool2d(maxpool_kernel),
+            nn.ConvTranspose2d(
+                self.cnn2_out_channels, cnn1_out_channels, cnn_kernel_size),
+            self.activation,
+            self.dropout,
+            nn.MaxUnpool2d(maxpool_kernel),
+            nn.ConvTranspose2d(
+                cnn1_out_channels, INPUT_CHANNELS, cnn_kernel_size),
+            nn.Sigmoid()
+        )
+
+        #self.decoder = nn.Sequential(
+        #    nn.Linear(self.z_dim, self.cnn2_out_channels * last_w * last_h),
+        #    self.activation,
+        #    nn.Linear(self.cnn2_out_channels * last_w * last_h,
+        #              IMAGE_SIZE * INPUT_CHANNELS)
+        #)
+
         # defaut to pretrain mode.
         self.set_mode("pretrain")
 
-        # Acivation fxn on decoder default state.
-        self._dec_act = None
-
-        if binary:
-            self._dec_act = nn.Sigmoid()
-
         self.create_gmm_param()
-
-    def set_mode(self, setting):
-        """Used by forward to determine what to do with the data."""
-        assert setting in ["pretrain", "train"]
-
-        self.mode = setting
-
-        if setting == "pretrain":
-            pass
-        elif setting == "train":
-            pass
 
     def _calc_output_size(self, width, kernel, pad, stride, pool,
                           level=1, n_levels=1):
@@ -198,6 +207,24 @@ class VaDE(nn.Module):
         return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
             0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
 
+    def _calc_bce(self, recon_x, x):
+        bce = -torch.sum(
+            x*torch.log(torch.clamp(recon_x, min=EPS)) +
+            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
+
+        return(bce)
+
+    def set_mode(self, setting):
+        """Used by forward to determine what to do with the data."""
+        assert setting in ["pretrain", "train"]
+
+        self.mode = setting
+
+        if setting == "pretrain":
+            pass
+        elif setting == "train":
+            pass
+
     def create_gmm_param(self):
         """
         t_p = Probability of each gaussian (all equal for now)
@@ -239,7 +266,7 @@ class VaDE(nn.Module):
                 inputs = inputs.cuda()
 
             inputs = Variable(inputs)
-            z, _, _ = self.encode(inputs)
+            z, _, _, _ = self.encode(inputs)
             data.append(z.data.cpu().numpy())
 
         data = np.concatenate(data)
@@ -261,20 +288,33 @@ class VaDE(nn.Module):
         Elif mode is pretrain:
         Return a reconstruction from a normal-style autoencoder.
         """
-        z, mu, logvar = self.encode(x)
-        x_recon = self.decode(z)
+        z, mu, logvar, maxpool_indices = self.encode(x)
+        x_recon = self.decode(z, maxpool_indices)
         return(x_recon, x, z, mu, logvar)
 
     def encode(self, x):
         """Encode x into latent z."""
-        hid = self.encoder_cnn(x)
-        hid = hid.view([hid.size(0), -1])
+        # Loop through CNN encoder to grab the indices for MaxUnpoolng
+        indices = []
+        for layer in self.encoder_cnn:
+            if isinstance(layer, nn.MaxPool2d):
+                x, idx = layer(x)
+                indices.append(idx)
+            else:
+                x = layer(x)
+
+        # Flatten for linear layers.
+        hid = x.view([x.size(0), -1])
+
+        # Apply linear layers to get samples (mu, sigma).
         hid = self.encoder_mlp(hid)
         mu = self._enc_mu(hid)
         logvar = self._enc_log_sigma(hid)
+
+        # Generate latent layer.
         z = self.reparameterize(mu, logvar)
 
-        return(z, mu, logvar)
+        return(z, mu, logvar, indices)
 
     def reparameterize(self, mu, lv):
         """
@@ -287,24 +327,27 @@ class VaDE(nn.Module):
         else:
           return(mu)
 
-    def decode(self, z):
+    def decode(self, z, indices):
         """Reconstruct x from latent z."""
-        x_recon = self.decoder(z)
+        hid = self.decoder_mlp(z)
+        hid = hid.view([hid.size(0),
+                        self.cnn2_out_channels,
+                        self.last_w,
+                        self.last_h]
+        )
 
-        # Applies Sigmoid if binary=true.
-        if self._dec_act is not None:
-            x_recon = self._dec_act(x_recon)
+        # Loop through CNN decoder to apply the indices for MaxUnpoolng
+        indices = list(reversed(indices))
+        maxunpool_idx = 0
 
-        x_recon = x_recon.view((z.size(0), INPUT_CHANNELS, IMAGE_H, IMAGE_W))
+        for layer in self.decoder_cnn:
+            if isinstance(layer, nn.MaxUnpool2d):
+                hid = layer(hid, indices[maxunpool_idx])
+                maxunpool_idx += 1
+            else:
+                hid = layer(hid)
 
-        return(x_recon)
-
-    def _calc_bce(self, recon_x, x):
-        bce = -torch.sum(
-            x*torch.log(torch.clamp(recon_x, min=EPS)) +
-            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
-
-        return(bce)
+        return(hid)
 
     def vae_loss(self, recon_x, x, mu, logvar):
         """Standard VAE loss (for a single Gaussian prior)."""
