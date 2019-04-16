@@ -42,7 +42,7 @@ class HoromaTransformsResNet:
 
 class HoromaTransforms:
     """
-    Performs all transforms at once.
+    Performs all transforms at once. Output images are in the range [0, 1]
     """
 
     def __init__(self):
@@ -51,7 +51,7 @@ class HoromaTransforms:
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
             RandomQuarterTurn(),
-            transforms.ToTensor()
+            transforms.ToTensor(),
         ])
 
     def __call__(self, img):
