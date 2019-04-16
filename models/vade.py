@@ -2,6 +2,7 @@
 Cloned from https://github.com/eelxpeng/UnsupervisedDeepLearning-Pytorch
 on Mar 28th 2019. Style edits and refactoring by Joseph D Viviano.
 """
+from configs.constants import IMAGE_SIZE, INPUT_CHANNELS, IMAGE_H, IMAGE_W
 from sklearn.mixture import GaussianMixture
 from sklearn.utils.linear_assignment_ import linear_assignment
 from skopt.space import Real, Integer
@@ -17,26 +18,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchvision
 
-from configs.constants import IMAGE_SIZE, INPUT_CHANNELS, IMAGE_H, IMAGE_W
-
 PAD = 0
 STRIDE = 1
-
 LOG2PI = math.log(2*math.pi)
 EPS = 1e-10
 CUDA = torch.cuda.is_available()
-
-def cluster_acc(Y_pred, Y):
-  assert Y_pred.size == Y.size
-
-  D = max(Y_pred.max(), Y.max())+1
-  w = np.zeros((D,D), dtype=np.int64)
-
-  for i in range(Y_pred.size):
-    w[Y_pred[i], Y[i]] += 1
-  ind = linear_assignment(w.max() - w)
-
-  return(sum([w[i,j] for i,j in ind])*1.0/Y_pred.size, w)
 
 
 class VaDE(nn.Module):
@@ -88,12 +74,9 @@ class VaDE(nn.Module):
                       IMAGE_SIZE * INPUT_CHANNELS)
         )
 
-        # for VAE
+        # Encoding to the prior.
         self._enc_mu = nn.Linear(lin2_in_channels, z_dim)
         self._enc_log_sigma = nn.Linear(lin2_in_channels, z_dim)
-
-        # for pre-train only
-        self._pre_in = nn.Linear(lin2_in_channels, z_dim)
 
         # defaut to pretrain mode.
         self.set_mode("pretrain")
@@ -113,13 +96,9 @@ class VaDE(nn.Module):
         self.mode = setting
 
         if setting == "pretrain":
-            self._enc_mu.requires_grad = False
-            self._enc_log_sigma.requires_grad = False
-            self._pre_in.requires_grad = True
+            pass
         elif setting == "train":
-            self._enc_mu.requires_grad = True
-            self._enc_log_sigma.requires_grad = True
-            self._pre_in.requires_grad = False
+            pass
 
     def _calc_output_size(self, width, kernel, pad, stride, pool,
                           level=1, n_levels=1):
@@ -250,6 +229,8 @@ class VaDE(nn.Module):
         self.eval()
         data = []
 
+        self.set_mode("train")
+
         # Get a collection of latent variables to fit the GMM to.
         for batch_idx, inputs in enumerate(dataloader):
             #inputs = inputs.view(inputs.size(0), -1).float()
@@ -272,17 +253,6 @@ class VaDE(nn.Module):
         self.l_p.data.copy_(torch.from_numpy(
             gmm.covariances_.T.astype(np.float32)))
 
-    def reparameterize(self, mu, lv):
-        """
-        Reparameterizion trick to get the mean and log variance of the encoder.
-        """
-        if self.training:
-          std = lv.mul(0.5).exp_()
-          eps = Variable(std.data.new(std.size()).normal_())
-          return(eps.mul(std).add_(mu))
-        else:
-          return(mu)
-
     def forward(self, x):
         """
         If mode is train:
@@ -291,13 +261,9 @@ class VaDE(nn.Module):
         Elif mode is pretrain:
         Return a reconstruction from a normal-style autoencoder.
         """
-        if self.mode == "train":
-            z, mu, logvar = self.encode(x)
-            x_recon = self.decode(z)
-            return(x_recon, x, z, mu, logvar)
-        elif self.mode == "pretrain":
-            x_recon = self.pretrain(x)
-            return(x_recon)
+        z, mu, logvar = self.encode(x)
+        x_recon = self.decode(z)
+        return(x_recon, x, z, mu, logvar)
 
     def encode(self, x):
         """Encode x into latent z."""
@@ -309,6 +275,17 @@ class VaDE(nn.Module):
         z = self.reparameterize(mu, logvar)
 
         return(z, mu, logvar)
+
+    def reparameterize(self, mu, lv):
+        """
+        Reparameterizion trick to get the mean and log variance of the encoder.
+        """
+        if self.training:
+          std = lv.mul(0.5).exp_()
+          eps = Variable(std.data.new(std.size()).normal_())
+          return(eps.mul(std).add_(mu))
+        else:
+          return(mu)
 
     def decode(self, z):
         """Reconstruct x from latent z."""
@@ -322,17 +299,30 @@ class VaDE(nn.Module):
 
         return(x_recon)
 
-    def pretrain(self, x):
-        """Does encoder-decoder in the style of a standard AE."""
-        hid = self.encoder_cnn(x)
-        hid = hid.view([hid.size(0), -1])
-        hid = self.encoder_mlp(hid)
-        z = self._pre_in(hid)
-        x_recon = self.decode(z)
+    def _calc_bce(self, recon_x, x):
+        bce = -torch.sum(
+            x*torch.log(torch.clamp(recon_x, min=EPS)) +
+            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
 
-        return(x_recon)
+        return(bce)
+
+    def vae_loss(self, recon_x, x, mu, logvar):
+        """Standard VAE loss (for a single Gaussian prior)."""
+        if self.mode == "train":
+            raise Exception("wrong loss for this mode!")
+        BCE = torch.mean(self._calc_bce(recon_x, x))
+
+        # see Appendix B from VAE paper:
+        # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+        # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+        KLD = -0.5 * torch.sum(1 + logvar - mu**2 -  logvar.exp())
+        return(BCE + KLD)
+
 
     def loss(self, recon_x, x, z, z_mu, z_lv):
+        """VaDE loss, with a mixture of gaussians prior."""
+        if self.mode == "pretrain":
+            raise Exception("wrong loss for this mode!")
 
         # NxDxK
         z_mu_t = self._get_z_mu_t(z_mu)  # Mean of z.
@@ -345,9 +335,7 @@ class VaDE(nn.Module):
         t_2d = self._get_t_2d(z)  # for p(c)
 
         # log p(x|z)
-        bce = -torch.sum(
-            x*torch.log(torch.clamp(recon_x, min=EPS)) +
-            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
+        bce = self._calc_bce(recon_x, x)
 
         # log p(z|c)
         logpzc = torch.sum(
