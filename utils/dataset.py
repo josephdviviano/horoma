@@ -25,6 +25,8 @@ class HoromaDataset(Dataset):
         width = 32
         datatype = "uint8"
 
+        data_dir = data_dir.strip()
+
         if split == "train":
             self.nb_examples = 152000  # old: 150900
         elif split == "valid":
@@ -39,6 +41,8 @@ class HoromaDataset(Dataset):
             self.nb_examples = 635  # old: DNE
         elif split == "valid_overlapped":
             self.nb_examples = 696  # old: 1331
+        elif split == "full_labeled_overlapped":
+            self.nb_examples = 1331
         else:
             raise ("Dataset: Invalid split. "
                    "Must be [train, valid, test, train_overlapped, valid_overlapped]")
