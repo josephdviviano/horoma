@@ -3,12 +3,12 @@
     "n_gpu": 1,
     "numpy_seed": 1,
     "torch_seed": 1,
-    "wall_time": 2,
+    "wall_time": 4,
     "model": {
         "type": "VaDE",
         "args": {
             "z_dim": 5,
-            "n_centroids": 100,
+            "n_centroids": 17,
             "binary": false,
             "cnn_kernel_size": 5,
             "cnn1_out_channels": 10,
