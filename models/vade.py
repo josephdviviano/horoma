@@ -33,9 +33,9 @@ class VaDE(nn.Module):
         Real(0.1, 0.5, name="dropout")
     ]
 
-    def __init__(self, z_dim=10, n_centroids=10, binary=True,
+    def __init__(self, z_dim=10, n_centroids=10, dropout=0.1,
                  cnn1_out_channels=10, cnn2_out_channels=20, cnn_kernel_size=5,
-                 lin2_in_channels=50, maxpool_kernel=2, dropout=0.1):
+                 lin2_in_channels=50, maxpool_kernel=2):
         super(self.__class__, self).__init__()
 
         # Save settings for later.
@@ -103,9 +103,6 @@ class VaDE(nn.Module):
         #    nn.Linear(self.cnn2_out_channels * last_w * last_h,
         #              IMAGE_SIZE * INPUT_CHANNELS)
         #)
-
-        # defaut to pretrain mode.
-        self.set_mode("pretrain")
 
         self.create_gmm_param()
 
@@ -214,17 +211,6 @@ class VaDE(nn.Module):
 
         return(bce)
 
-    def set_mode(self, setting):
-        """Used by forward to determine what to do with the data."""
-        assert setting in ["pretrain", "train"]
-
-        self.mode = setting
-
-        if setting == "pretrain":
-            pass
-        elif setting == "train":
-            pass
-
     def create_gmm_param(self):
         """
         t_p = Probability of each gaussian (all equal for now)
@@ -255,8 +241,6 @@ class VaDE(nn.Module):
 
         self.eval()
         data = []
-
-        self.set_mode("train")
 
         # Get a collection of latent variables to fit the GMM to.
         for batch_idx, inputs in enumerate(dataloader):
@@ -351,8 +335,6 @@ class VaDE(nn.Module):
 
     def vae_loss(self, recon_x, x, mu, logvar):
         """Standard VAE loss (for a single Gaussian prior)."""
-        if self.mode == "train":
-            raise Exception("wrong loss for this mode!")
         BCE = torch.mean(self._calc_bce(recon_x, x))
 
         # see Appendix B from VAE paper:
@@ -364,9 +346,6 @@ class VaDE(nn.Module):
 
     def loss(self, recon_x, x, z, z_mu, z_lv):
         """VaDE loss, with a mixture of gaussians prior."""
-        if self.mode == "pretrain":
-            raise Exception("wrong loss for this mode!")
-
         # NxDxK
         z_mu_t = self._get_z_mu_t(z_mu)  # Mean of z.
         z_lv_t = self._get_z_lv_t(z_lv)  # Log variance of z.
