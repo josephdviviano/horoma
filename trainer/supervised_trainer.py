@@ -3,88 +3,9 @@ from time import time
 from trainer.basetrainer import BaseTrainer
 from utils.dataset import SplitDataset
 import torch
-
-import os
-
 import numpy as np
-from PIL import Image
+from torch.utils.data import DataLoader
 
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-
-# Transforms to be used when defining loaders
-train_transformer = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    transforms.RandomCrop((28, 28)),
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103]),
-])
-
-eval_transformer = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103]),
-])
-
-mappings = {'BJ': 0, 'BP': 1, 'CR': 2, 'EB': 3, 'EN': 4, 'EO': 5, 'ES': 6, 'EU': 7, 'FR': 8, 'HG': 9,
-            'PB': 10, 'PE': 11, 'PR': 12, 'PT': 13, 'PU': 14, 'SB': 15, 'TO': 16, 'UN': -1}
-
-
-class HoromaDataset(Dataset):
-    def __init__(self, root='/rap/jvb-000-aa/COURS2019/etudiants/data/horoma', train=False, transform=None, target_transform=lambda x: mappings[x]):
-        super(Dataset, self).__init__()
-        self.root = os.path.expanduser(root)
-        self.transform = transform
-        self.target_transform = target_transform
-        self.train = train
-
-        if self.train:
-            # Labeled examples from Horoma (recommended split)
-            self.train_data = np.memmap(os.path.join(self.root, 'train_labeled_overlapped_x.dat'),
-                                        dtype='uint8', mode="r", shape=(635, 32, 32, 3))
-            self.train_labels = np.loadtxt(os.path.join(self.root, 'train_labeled_overlapped_y.txt'), 'U2').tolist()
-
-        else:
-            self.test_data = np.memmap(os.path.join(self.root, 'valid_x.dat'),
-                                       dtype='uint8', mode="r", shape=(252, 32, 32, 3))
-            self.test_labels = np.loadtxt(os.path.join(self.root, 'valid_y.txt'), 'U2').tolist()
-            # self.test_data = np.memmap(os.path.join(self.root, 'valid_overlapped_x.dat'),
-            #                            dtype='uint8', mode="r", shape=(696, 32, 32, 3))
-            # self.test_labels = np.loadtxt(os.path.join(self.root, 'valid_overlapped_y.txt'), 'U2').tolist()
-
-    def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            tuple: (image, target) where target is index of the target class.
-        """
-
-        if self.train:
-            img, target = self.train_data[index], self.train_labels[index]
-        else:
-            img, target = self.test_data[index], self.test_labels[index]
-
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img = Image.fromarray(img, mode='RGB')
-
-        if self.transform is not None:
-            img = self.transform(img)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return img, target
-
-    def __len__(self):
-        if self.train:
-            return len(self.train_data)
-        else:
-            return len(self.test_data)
 
 class SupervisedTrainer(BaseTrainer):
     """
