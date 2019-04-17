@@ -19,7 +19,7 @@
         }
     },
     "trainer": {
-        "epochs": 100,
+        "epochs": 200,
         "save_dir": "saved/",
         "log_dir": "logs/",
         "save_period": 10,
@@ -33,7 +33,7 @@
     },
     "data": {
         "dataset": {
-            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2/data",
             "flattened": false
         },
         "dataloader": {

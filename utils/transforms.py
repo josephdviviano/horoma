@@ -28,12 +28,12 @@ class HoromaTransformsResNet:
     def __init__(self):
         self.transforms = transforms.Compose([
             transforms.ToPILImage(),
-            transforms.Resize((224, 224)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomVerticalFlip(),
-            RandomQuarterTurn(),
+            transforms.RandomCrop((28, 28)),
+            transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103])
+            transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103]),
         ])
 
     def __call__(self, img):

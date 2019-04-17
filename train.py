@@ -27,7 +27,7 @@ def main(config, resume, test_run=False, helios_run=None, horoma_test=False):
     torch.manual_seed(config["torch_seed"])
     torch.cuda.manual_seed_all(config["torch_seed"])
 
-    TRANSFORMS = HoromaTransforms()
+    TRANSFORMS = HoromaTransformsResNet()
 
     # setup data_loader instances
     if not test_run:
@@ -69,7 +69,7 @@ def main(config, resume, test_run=False, helios_run=None, horoma_test=False):
     print(model)
     print()
 
-    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
+    trainable_params = model.fc.parameters()
     optimizer = OptimizerFactory.get(config, trainable_params)
 
     trainer = TrainerFactory.get(config)(
