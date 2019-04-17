@@ -7,9 +7,8 @@
     "model": {
         "type": "VaDE",
         "args": {
-            "z_dim": 5,
+            "z_dim": 20,
             "n_centroids": 17,
-            "binary": false,
             "cnn_kernel_size": 5,
             "cnn1_out_channels": 10,
             "cnn2_out_channels": 20,
@@ -21,8 +20,8 @@
     "optimizer": {
         "type": "Adam",
         "args":{
-            "lr": 0.001,
-            "weight_decay": 0.0001,
+            "lr": 0.0001,
+            "weight_decay": 0.00001,
             "amsgrad": false
         }
     },
@@ -33,7 +32,7 @@
         "save_period": 10,
         "type": "ClusterKMeansVadeTrainer",
         "options": {
-            "n_clusters": 100,
+            "n_clusters": 50,
             "kmeans_interval": 0,
             "kmeans_headstart": 0,
             "kmeans_weight": 1000.0
