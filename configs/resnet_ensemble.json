@@ -34,7 +34,7 @@
     },
     "data": {
         "dataset": {
-            "data_dir": "./data/",
+            "data_dir": "/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2/data",
             "flattened": false
         },
         "dataloader": {
