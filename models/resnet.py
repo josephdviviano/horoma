@@ -5,7 +5,8 @@ import torch.utils.model_zoo as model_zoo
 #from torchvision.models.resnet import ResNet, BasicBlock
 
 model_urls = {'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-             'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'}
+             'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth',
+             'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth'}
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1):
     """3x3 convolution with padding"""
@@ -158,7 +159,7 @@ class ResNet(nn.Module):
                                 base_width=self.base_width, norm_layer=norm_layer))
 
         return nn.Sequential(*layers)
-    
+
     def feature_extract(self, x):
         with torch.no_grad():
             x = self.conv1(x)
@@ -174,10 +175,10 @@ class ResNet(nn.Module):
             x = self.avgpool(x)
             features = x.view(x.size(0), -1)
         return features
-            
+
 
     def forward(self, features):
-        
+
         outputs = self.fc(features)
 
         return outputs
@@ -194,7 +195,7 @@ class ResNet18(ResNet):
 
         self.fc = nn.Linear(512, num_classes)
         self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
-    
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -235,9 +236,9 @@ class ResNet18_Ens(ResNet):
         # Freeze dem weights.
         for param in self.parameters():
             param.requires_grad = False
-            
+
         self.num_heads = num_heads
-        
+
         for i in range(self.num_heads):
             setattr(self, "head{}".format(i),  nn.Linear(512, num_classes))
         self.curr_head = 0
@@ -245,14 +246,14 @@ class ResNet18_Ens(ResNet):
 
         self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
         self.num_classes = num_classes
-                    
+
     def change_head(self, head_number):
         if 0 <= head_number < self.num_heads:
             self.curr_head = head_number
             self.fc = getattr(self, "head{}".format(head_number))
         else:
             print("change_head failed, current head is still {}".format(self.curr_head))
-                    
+
     def loss(self, x, label):
         """
         Loss logic for the Vanilla AE.
@@ -266,7 +267,7 @@ class ResNet18_Ens(ResNet):
         loss = self.crossentropy(x, label)
 
         return loss
-    
+
     def ensemble_predict(self, features, mode = "hard"):
         soft_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
         hard_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
@@ -281,33 +282,39 @@ class ResNet18_Ens(ResNet):
             return hard_vote
         elif mode == "soft":
             return soft_vote
-        
+
 class ResNet34_Ens(ResNet):
-    def __init__(self, num_classes=17, num_heads = 10):
+    def __init__(self, num_classes=17, num_heads=10, dropout=0.5):
         super(ResNet34_Ens, self).__init__(BasicBlock,  [3, 4, 6, 3])
         self.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
 
         # Freeze dem weights.
         for param in self.parameters():
             param.requires_grad = False
-            
+
         self.num_heads = num_heads
-        
+
         for i in range(self.num_heads):
-            setattr(self, "head{}".format(i),  nn.Linear(512, num_classes))
+            setattr(self, "head{}".format(i),
+                    nn.Sequential(nn.Linear(512, 512),
+                                  nn.Dropout(p=dropout),
+                                  nn.Linear(512, num_classes)
+                    )
+            )
+
         self.curr_head = 0
         self.change_head(self.curr_head)
 
         self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
         self.num_classes = num_classes
-                    
+
     def change_head(self, head_number):
         if 0 <= head_number < self.num_heads:
             self.curr_head = head_number
             self.fc = getattr(self, "head{}".format(head_number))
         else:
             print("change_head failed, current head is still {}".format(self.curr_head))
-                    
+
     def loss(self, x, label):
         """
         Loss logic for the Vanilla AE.
@@ -321,7 +328,7 @@ class ResNet34_Ens(ResNet):
         loss = self.crossentropy(x, label)
 
         return loss
-    
+
     def ensemble_predict(self, features, mode = "hard"):
         soft_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
         hard_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
@@ -336,6 +343,4 @@ class ResNet34_Ens(ResNet):
             return hard_vote
         elif mode == "soft":
             return soft_vote
-            
-        
 

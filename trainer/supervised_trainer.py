@@ -61,18 +61,6 @@ class SupervisedTrainer(BaseTrainer):
             pin_memory=True
         )
 
-        # train_loader = DataLoader(
-        #     dataset=HoromaDataset(train=True, transform=train_transformer),
-        #     **config['data']['dataloader']['train'],
-        #     pin_memory=True
-        # )
-        #
-        # valid_loader = DataLoader(
-        #     dataset=HoromaDataset(train=False, transform=eval_transformer),
-        #     **config['data']['dataloader']['valid'],
-        #     pin_memory=True
-        # )
-
         print(
             '>> Total batch number for training: {}'.format(len(train_loader)))
         print('>> Total batch number for validation: {}'.format(
@@ -122,15 +110,6 @@ class SupervisedTrainer(BaseTrainer):
 
             end_it = time()
             time_it = end_it - start_it
-            #if batch_idx % self.log_step == 0:
-            #    self.logger.info(
-            #        '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
-            #            batch_idx * self.train_loader.batch_size + X.size(
-            #                0),
-            #            len(self.train_loader.dataset),
-            #            100.0 * batch_idx / len(self.train_loader),
-            #            time_it * (len(self.train_loader) - batch_idx),
-            #            loss.item()))
 
         self.logger.info('   > Total loss: {:.6f} Total F1: {:.6f}'.format(
             total_loss / len(self.train_loader),
@@ -179,14 +158,6 @@ class SupervisedTrainer(BaseTrainer):
 
             end_it = time()
             time_it = end_it - start_it
-            #if batch_idx % self.log_step == 0:
-            #    self.logger.info(MSG.format(
-            #        batch_idx * self.valid_loader.batch_size + X.size(0),
-            #        len(self.valid_loader.dataset),
-            #        100.0 * batch_idx / len(self.valid_loader),
-            #        time_it * (len(self.valid_loader) - batch_idx),
-            #        loss.item(),
-            #        f1))
 
         self.logger.info('   > Total loss: {:.6f}, Total F1: {:.6f}'.format(
             total_loss / len(self.valid_loader),

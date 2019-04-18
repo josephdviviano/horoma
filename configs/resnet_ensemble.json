@@ -1,5 +1,5 @@
 {
-    "name": "resnet_clusters_kmeans",
+    "name": "resnet_dropout_ensenble",
     "n_gpu": 1,
     "numpy_seed": 1,
     "torch_seed": 1,
@@ -8,14 +8,15 @@
         "type": "ResNet34_Ens",
         "args": {
             "num_classes": 17,
-            "num_heads":21
+            "num_heads": 50,
+            "dropout": 0.5
         }
     },
     "optimizer": {
         "type": "Adam",
         "args":{
             "lr": 0.001,
-            "weight_decay": 0,
+            "weight_decay": 0.0001,
             "amsgrad": false
         }
     },
@@ -40,11 +41,11 @@
         "dataloader": {
             "split": 0.7,
             "train": {
-                "batch_size": 64,
+                "batch_size": 16,
                 "shuffle": true
             },
             "valid": {
-                "batch_size": 64,
+                "batch_size": 16,
                 "shuffle": false
             }
         }
