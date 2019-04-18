@@ -274,14 +274,14 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
 
         # pre-training as a normal vae
         self.model.train()
-        for epoch in range(2):
-            print('pretrain epoch {}'.format(epoch))
-            for batch_idx, data in enumerate(self.train_loader):
-                data = data.to(self.device)
-                x_recon, x, z, mu, logvar = self.model(data)
-                loss = self.model.vae_loss(x_recon, x, mu, logvar)
-                loss.backward()
-                self.optimizer.step()
+        #for epoch in range(2):
+        #    print('pretrain epoch {}'.format(epoch))
+        #    for batch_idx, data in enumerate(self.train_loader):
+        #        data = data.to(self.device)
+        #        x_recon, x, z, mu, logvar = self.model(data)
+        #        loss = self.model.vae_loss(x_recon, x, mu, logvar)
+        #        loss.backward()
+        #        self.optimizer.step()
 
         # Construct the embeddings (switch to VaDE mode).
         self.cluster_collection.cluster_helper.build_embeddings()
