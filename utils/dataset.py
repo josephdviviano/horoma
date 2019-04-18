@@ -179,7 +179,9 @@ class SplitDataset:
         valid_indices = indices[np.isin(unique_region_inverse, valid_regions)]
 
         train_set = Subset(dataset, train_indices)
+        train_set.region_ids = dataset.region_ids[train_indices]
         valid_set = Subset(dataset, valid_indices)
+        valid_set.dataset.regions_ids = dataset.region_ids[valid_indices]
 
         return train_set, valid_set
 

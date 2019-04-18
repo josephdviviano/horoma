@@ -1,0 +1,52 @@
+{
+    "name": "resnet_clusters_kmeans",
+    "n_gpu": 1,
+    "numpy_seed": 1,
+    "torch_seed": 1,
+    "wall_time": 2,
+    "model": {
+        "type": "ResNet34_Ens",
+        "args": {
+            "num_classes": 17,
+            "num_heads":21
+        }
+    },
+    "optimizer": {
+        "type": "Adam",
+        "args":{
+            "lr": 0.001,
+            "weight_decay": 0,
+            "amsgrad": false
+        }
+    },
+    "trainer": {
+        "epochs": 200,
+        "save_dir": "saved/",
+        "log_dir": "logs/",
+        "save_period": 10,
+        "type": "SupervisedTrainer",
+        "options": {
+            "n_clusters": 100,
+            "kmeans_interval": 0,
+            "kmeans_headstart": 0,
+            "kmeans_weight": 10.0
+        }
+    },
+    "data": {
+        "dataset": {
+            "data_dir": "./data/",
+            "flattened": false
+        },
+        "dataloader": {
+            "split": 0.7,
+            "train": {
+                "batch_size": 64,
+                "shuffle": true
+            },
+            "valid": {
+                "batch_size": 64,
+                "shuffle": false
+            }
+        }
+    }
+}
