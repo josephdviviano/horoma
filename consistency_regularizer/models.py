@@ -293,10 +293,13 @@ class TransformerNet2D(nn.Module):
                  key_dim=None,
                  val_dim=None,
                  inner_dim=None,
-                 dropout=0.1
+                 dropout=0.2,
+                 use_transformer=True
                  ):
         super(TransformerNet2D, self).__init__()
         # self.preprocess = pp.Preprocessor()
+
+        self.use_transformer = use_transformer
 
         self.conv1 = nn.Conv2d(input_size, hidden_size, kernel_size)
         # size of output
@@ -346,6 +349,18 @@ class TransformerNet2D(nn.Module):
                 nn.Linear(200, o)
             ) for o in output_size
         ]
+        if not self.use_transformer:
+            print("Not using transformer")
+            output_modules = [
+                nn.Sequential(
+                    nn.Linear(lout*lout*hidden_size, 200),
+                    nn.ReLU(),
+                    nn.Linear(200, 200),
+                    nn.ReLU(),
+                    nn.Linear(200, o)
+                ) for o in output_size
+            ]
+
         if len(output_modules) == 1:
             self.out = output_modules[0]
         else:
@@ -374,9 +389,11 @@ class TransformerNet2D(nn.Module):
         x = self.nl(self.pool2(self.conv2(x)))
         x = self.nl(self.pool3(self.conv3(x)))
 
-        x = x.view(x.shape[0], x.shape[1], self.lout*self.lout)
-
-        data = x.permute(0, 2, 1)
+        if self.use_transformer:
+            x = x.view(x.shape[0], x.shape[1], self.lout*self.lout)
+            data = x.permute(0, 2, 1)
+        else:
+            data = x.view(x.shape[0], -1)
 
         for enc_layer in self.layer_stack:
             data, _ = enc_layer(data)

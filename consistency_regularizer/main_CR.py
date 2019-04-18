@@ -270,9 +270,9 @@ def main():
         out_size = [target_out_size_dict[a] for a in target_labels]
     n_layers = 0  # hyper-parameter
     hidden_size = 256  # hyper-parameter # 128
-    kernel_size = 2  # for CNN1D only
-    pool_size = 2  # for CNN1D only
-    dropout = 0.2
+    kernel_size = 2  # for CNN2D only
+    pool_size = 2  # for CNN2D only
+    dropout = 0.5
     n_heads = 8  # 4
     key_dim = 128
     val_dim = 128
