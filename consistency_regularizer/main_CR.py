@@ -39,21 +39,21 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=128,
+        default=635,
         metavar="N",
         help="input batch size for training (default: 64)",
     )
     parser.add_argument(
         "--eval-batch-size",
         type=int,
-        default=256,
+        default=252,
         metavar="N",
         help="input batch size for evaluation (default: 256)",
     )
     parser.add_argument(
         "--iters",
         type=int,
-        default=7000,
+        default=2000,
         metavar="N",
         help="number of iterations to train (default: 10000)",
     )
@@ -147,7 +147,7 @@ def main():
     parser.add_argument(
         "--log-interval",
         type=int,
-        default=10,
+        default=1,
         metavar="N",
         help="how many batches to wait before logging training status",
     )
