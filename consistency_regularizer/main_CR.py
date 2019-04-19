@@ -10,7 +10,7 @@ import models
 import horoma_dataset
 import torch.nn.functional as F
 from torchvision import transforms
-# from ..utils.transforms import HoromaTransforms
+from image_transforms import HoromaTransforms, HoromaTransformsCR
 
 
 def entropy_classification(x):
@@ -39,7 +39,7 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=64,
+        default=128,
         metavar="N",
         help="input batch size for training (default: 64)",
     )
@@ -208,13 +208,15 @@ def main():
     train_labeled_dataset = horoma_dataset.HoromaDataset(
         data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
         split="train_labeled_overlapped",
-        transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
+        # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
+        transforms=HoromaTransforms(),
         # flattened=True, # set it true for 1D model
     )
 
     valid_dataset = horoma_dataset.HoromaDataset(
         data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
         split="valid",
+        # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(), transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103])]),
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True, # set it true for 1D model
     )
