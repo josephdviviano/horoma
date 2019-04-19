@@ -31,7 +31,7 @@ class SupervisedTrainer(BaseTrainer):
         :param kwargs: additional arguments if necessary
         """
         super(SupervisedTrainer, self).__init__(model, optimizer, resume, config,
-                                      helios_run, experiment_folder)
+                                      helios_run, experiment_folder, config["trainer"]["options"]["WithEarlyStop"])
         self.config = config
 
         ############################################
@@ -52,13 +52,13 @@ class SupervisedTrainer(BaseTrainer):
         train_loader = DataLoader(
             dataset=train_set,
             **config['data']['dataloader']['train'],
-            pin_memory=True
+            pin_memory=True, drop_last = True
         )
 
         valid_loader = DataLoader(
             dataset=valid_set,
             **config['data']['dataloader']['valid'],
-            pin_memory=True
+            pin_memory=True, drop_last = True
         )
 
         print(
@@ -159,9 +159,11 @@ class SupervisedTrainer(BaseTrainer):
             end_it = time()
             time_it = end_it - start_it
 
+        f1_scr = f1_score(labels, predicted, average='weighted')
+
         self.logger.info('   > Total loss: {:.6f}, Total F1: {:.6f}'.format(
             total_loss / len(self.valid_loader),
             f1_score(labels, predicted, average='weighted')))
-        self.tb_writer.add_scalar('valid/f1', f1_score(labels, predicted, average='weighted'), epoch)
+        self.tb_writer.add_scalar('valid/f1', f1_scr, epoch)
 
-        return total_loss / len(self.valid_loader)
+        return total_loss / len(self.valid_loader), f1_scr

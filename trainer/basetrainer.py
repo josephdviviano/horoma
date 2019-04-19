@@ -9,6 +9,7 @@ import torch
 from tensorboardX import SummaryWriter
 
 from utils.util import set_logger
+from utils.EarlyStopping import EarlyStopping
 
 logging.basicConfig(level=logging.INFO, format='')
 
@@ -18,8 +19,8 @@ class BaseTrainer:
     Base class for all trainers
     """
 
-    def __init__(self, model, optimizer, resume, config, helios_run,
-                 experiment_folder=None):
+    def __init__(self, model, optimizer, resume, config, helios_run, 
+                 experiment_folder=None, WithEarlyStop = False):
         """
         Initialize all the folders and logging for a training.
 
@@ -71,6 +72,7 @@ class BaseTrainer:
 
         self.best_other_metrics = {}
         self.best_valid = sys.maxsize
+        self.WithEarlyStop = WithEarlyStop 
 
         # Save configuration file into checkpoint directory:
         if not helios_run:
@@ -109,6 +111,8 @@ class BaseTrainer:
         Full training logic
         """
         t0 = time()
+        if self.WithEarlyStop:
+            EarlyStop = EarlyStopping()
 
         # with self.comet_writer.train():
         for epoch in range(self.start_epoch, self.epochs):
@@ -117,12 +121,18 @@ class BaseTrainer:
 
             # Get the training and validation loss
             train_loss = self._train_epoch(epoch)
-            valid_loss = self._valid_epoch(epoch)
+            valid_loss, f1_scr = self._valid_epoch(epoch)
+            
 
             if isinstance(valid_loss, tuple):
                 valid_loss, other_metrics = valid_loss
             else:
                 other_metrics = None
+
+            if self.WithEarlyStop:
+                Stop = EarlyStop(f1_scr)
+            else:
+                Stop = False
 
             self.tb_writer.add_scalar("train/epoch_loss", train_loss,
                                       epoch)
@@ -137,6 +147,9 @@ class BaseTrainer:
             if time_elapsed * (1 + 1 / (
                     epoch - self.start_epoch + 1)) > .95 * \
                     self.wall_time * 3600:
+                break
+            if Stop:
+                print("Breaking training Loop because of Early Stopping")
                 break
 
         # Save the checkpoint if it's not already done.

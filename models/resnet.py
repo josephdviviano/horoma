@@ -296,9 +296,9 @@ class ResNet34_Ens(ResNet):
 
         for i in range(self.num_heads):
             setattr(self, "head{}".format(i),
-                    nn.Sequential(nn.Linear(512, 512),
+                    nn.Sequential(nn.Linear(512, 100),nn.ReLU(),
                                   nn.Dropout(p=dropout),
-                                  nn.Linear(512, num_classes)
+                                  nn.Linear(100, num_classes)
                     )
             )
 
@@ -329,11 +329,16 @@ class ResNet34_Ens(ResNet):
 
         return loss
 
-    def ensemble_predict(self, features, mode = "hard"):
-        soft_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
-        hard_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
-        for i in range(self.num_heads):
-            self.change_head(i)
+    def ensemble_predict(self, features, mode = "hard", use_heads = []):
+        if use_heads == []:
+            use_heads = range(self.num_heads)
+        
+        soft_predictions = torch.zeros(len(use_heads), features.size(0), self.num_classes)
+        hard_predictions = torch.zeros(len(use_heads), features.size(0), self.num_classes)
+
+        for i in range(len(use_heads)):
+            self.change_head(use_heads[i])
+            self.eval()
             soft_predictions[i,:,:] = self.fc(features)
             max_predictions, _ = torch.max(soft_predictions[i,:,:],dim=1)
             hard_predictions[i,:,:] = (soft_predictions[i,:,:] == max_predictions.view(-1,1))
