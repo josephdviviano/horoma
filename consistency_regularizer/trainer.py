@@ -230,14 +230,14 @@ class Trainer:
             # print('supervised_losses: ', supervised_losses)
             # print('supervised_loss: ', supervised_loss)
 
-            ecgId_pred, ecgId_true = None, None
+            treeId_pred, treeId_true = None, None
             if score_param_index[0] is not None:
                 i = score_param_index[0]
                 _, pred_classes = torch.max(outputs[i], dim=1)
-                ecgId_true = y_l[i].view(-1).tolist()
-                ecgId_pred = pred_classes.view(-1).tolist()
-                ecgId_pred = np.array(ecgId_pred, dtype=np.int32)
-                ecgId_true = np.array(ecgId_true, dtype=np.int32)
+                treeId_true = y_l[i].view(-1).tolist()
+                treeId_pred = pred_classes.view(-1).tolist()
+                treeId_pred = np.array(treeId_pred, dtype=np.int32)
+                treeId_true = np.array(treeId_true, dtype=np.int32)
 
             loss = supervised_loss + reg_loss + self.args.alpha * lds
             # loss = supervised_loss # + reg_loss + self.args.alpha * lds
@@ -250,8 +250,8 @@ class Trainer:
             # print('loss_final: ', loss)
 
             metrics = scoreF.scorePerformance(
-                ecgId_pred,
-                ecgId_true,
+                treeId_pred,
+                treeId_true,
             )
 
             for i in range(len(supervised_losses)):
