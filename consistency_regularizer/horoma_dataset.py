@@ -86,10 +86,10 @@ class HoromaDataset(Dataset):
             else:
                 pre_targets = pre_targets[skip : skip + subset]
 
-            self.map_labels = np.unique(pre_targets)
-
+            self.map_labels = {'BJ': 0, 'BP': 1, 'CR': 2, 'EB': 3, 'EN': 4, 'EO': 5, 'ES': 6, 'EU': 7, 'FR': 8, 'HG': 9, 'PB': 10, 'PE': 11, 'PR': 12, 'PT': 13, 'PU': 14, 'SB': 15, 'TO': 16}
+            # print(f"for {filename_y}, map_labels: \n{self.map_labels}")
             self.targets = np.asarray(
-                [np.where(self.map_labels == t)[0][0] for t in pre_targets]
+                [self.map_labels[k] for k in pre_targets]
             )
         self.labeled = (self.targets is not None)
 
