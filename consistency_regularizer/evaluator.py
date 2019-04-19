@@ -6,7 +6,7 @@ import scoring_function as scoreF
 
 def get_scoring_func_param_index(target_labels):
     scoring_func_param_index = [
-        None if target_labels.count("userid") == 0 else target_labels.index("userid")
+        None if target_labels.count("treeid") == 0 else target_labels.index("treeid")
     ]
     return scoring_func_param_index
 
@@ -14,16 +14,16 @@ def get_scoring_func_param_index(target_labels):
 def update_prediction_data(score_index, y, outputs, ID):
     score_param_index = score_index
 
-    ecgId_true, ecgId_pred = ID
+    treeId_true, treeId_pred = ID
 
     if score_param_index[0] is not None:
         i = score_param_index[0]
         _, pred_classes = torch.max(outputs[i], dim=1)
         if y is not None:
-            ecgId_true.extend(y[i].view(-1).tolist())
-        ecgId_pred.extend(pred_classes.view(-1).tolist())
+            treeId_true.extend(y[i].view(-1).tolist())
+        treeId_pred.extend(pred_classes.view(-1).tolist())
 
-    ID = [ecgId_true, ecgId_pred]
+    ID = [treeId_true, treeId_pred]
 
     return ID
 
@@ -40,12 +40,12 @@ def evaluate(
     if criterion is not None:
         assert len(weight) == len(criterion)
 
-    ecgId_pred, ecgId_true = None, None
+    treeId_pred, treeId_true = None, None
 
     # labeled = dataloader.dataset.labeled
 
     if score_param_index[0] is not None:
-        ecgId_pred, ecgId_true = [], [] if labeled else None
+        treeId_pred, treeId_true = [], [] if labeled else None
 
     valid_loss = 0
     valid_n_iter = 0
@@ -75,9 +75,9 @@ def evaluate(
                 loss = sum(loss)
 
             ID = update_prediction_data(
-                score_param_index, y, outputs, [ecgId_true, ecgId_pred]
+                score_param_index, y, outputs, [treeId_true, treeId_pred]
             )
-            ecgId_true, ecgId_pred = ID
+            treeId_true, treeId_pred = ID
 
             if labeled and (criterion is not None):
                 valid_loss += loss.item()
@@ -87,16 +87,16 @@ def evaluate(
     mean_loss = valid_loss / max(valid_n_iter, 1)
 
     # metrics
-    if ecgId_pred is not None:
-        ecgId_pred = np.array(ecgId_pred, dtype=np.int32)
-    if ecgId_true is not None:
-        ecgId_true = np.array(ecgId_true, dtype=np.int32)
+    if treeId_pred is not None:
+        treeId_pred = np.array(treeId_pred, dtype=np.int32)
+    if treeId_true is not None:
+        treeId_true = np.array(treeId_true, dtype=np.int32)
 
     if labeled:
-        metrics = scoreF.scorePerformance(ecgId_pred, ecgId_true)
+        metrics = scoreF.scorePerformance(treeId_pred, treeId_true)
     else:
-        return (ecgId_pred,)
+        return (treeId_pred,)
 
-    preds = ecgId_pred
+    preds = treeId_pred
     return mean_loss, metrics, preds
 

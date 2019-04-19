@@ -7,7 +7,6 @@ import data_utils
 from trainer import Trainer
 import models
 
-# import ecgdataset
 import horoma_dataset
 import torch.nn.functional as F
 from torchvision import transforms
@@ -19,24 +18,24 @@ def entropy_classification(x):
 
 
 # 17 classes for classification task
-target_out_size_dict = {"userid": 17}
+target_out_size_dict = {"treeid": 17}
 
 # Criterion loss to use for each output
-target_criterion_dict = {"userid": nn.CrossEntropyLoss()}
+target_criterion_dict = {"treeid": nn.CrossEntropyLoss()}
 
 # Entropy regularization for the different outputs - None means N/A (it does not apply)
-target_entropy_dict = {"userid": entropy_classification}
+target_entropy_dict = {"treeid": entropy_classification}
 
 
 # 0 for regression (MSE), 1 for classification (Kl_Div), None for Nothing
-target_vat_dict = {"userid": 1}  # 1, # None, #1,
+target_vat_dict = {"treeid": 1}  # 1, # None, #1,
 
 loss_weight = None
 
 
 def main():
     # Training settings
-    parser = argparse.ArgumentParser(description="PyTorch ECG Example")
+    parser = argparse.ArgumentParser(description="Horoma tree classification")
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -124,7 +123,7 @@ def main():
         "--targets",
         type=str,
         nargs="+",
-        default=["userid"],
+        default=["treeid"],
         help="list of targets to use for training",
     )
     parser.add_argument(
@@ -188,37 +187,13 @@ def main():
     targets = args.targets
     targets = ",".join(targets)
 
-    # scaler_dict = None
-
-    # train_labeled_dataset = ecgdataset.ECGDataset(
-    #     "{}/MILA_TrainLabeledData.dat".format(args.data_dir),
-    #     shape=(160, 3754),
-    #     use_transform=True,
-    #     target=targets,
-    # )
-    # scaler_dict = train_labeled_dataset.normalize_labels(scaler_dict)
-
-    # train_unlabeled_dataset = ecgdataset.ECGDataset(
-    #     "{}/MILA_UnlabeledData.dat".format(args.data_dir),
-    #     shape=(657233, 3750),
-    #     use_transform=False,
-    #     target=None,
-    #     return_doublon=True,
-    # )
-    # valid_dataset = ecgdataset.ECGDataset(
-    #     "{}/MILA_ValidationLabeledData.dat".format(args.data_dir),
-    #     shape=(160, 3754),
-    #     use_transform=False,
-    #     target=targets,
-    # )
-    # scaler_dict = valid_dataset.normalize_labels(scaler_dict)
 
     train_unlabeled_dataset = horoma_dataset.HoromaDataset(
         data_dir=args.data_dir,
         split="train",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True,
-        # subset=1,
+        # subset=10000,
     )
 
     all_labeled_dataset = horoma_dataset.HoromaDataset(
@@ -228,7 +203,7 @@ def main():
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True,
     )
-    splitter = horoma_dataset.SplitDataset(split=0.8)
+    splitter = horoma_dataset.SplitDataset(split=0.9)
     train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
 
     data_iterators = data_utils.get_iters(
