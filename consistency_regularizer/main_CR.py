@@ -192,19 +192,33 @@ def main():
         data_dir=args.data_dir,
         split="train",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
-        # flattened=True,
+        # flattened=True, # set it true for 1D model
         # subset=10000,
     )
 
-    all_labeled_dataset = horoma_dataset.HoromaDataset(
-        # data_dir="/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2",
-        data_dir=args.data_dir,
-        split="full_labeled",
+    # all_labeled_dataset = horoma_dataset.HoromaDataset(
+    #     data_dir=args.data_dir,
+    #     split="full_labeled",
+    #     transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
+    #     # flattened=True, # set it true for 1D model
+    # )
+    # splitter = horoma_dataset.SplitDataset(split=0.8)
+    # train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
+
+    train_labeled_dataset = horoma_dataset.HoromaDataset(
+        data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
+        split="train_labeled_overlapped",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
-        # flattened=True,
+        # flattened=True, # set it true for 1D model
     )
-    splitter = horoma_dataset.SplitDataset(split=0.9)
-    train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
+
+    valid_dataset = horoma_dataset.HoromaDataset(
+        data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
+        split="valid",
+        transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
+        # flattened=True, # set it true for 1D model
+    )
+
 
     data_iterators = data_utils.get_iters(
         train_labeled_dataset,
