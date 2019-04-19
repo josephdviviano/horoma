@@ -76,7 +76,7 @@ def main():
         type=float,
         default=0.005,
         metavar="ALPHA",  # 0.001 (actuellement),
-        help="regularization coefficient (default: 0.01)",
+        help="regularization coefficient (default: 0.005)",
     )
     parser.add_argument(
         "--ema_decay",
@@ -169,6 +169,11 @@ def main():
         type=float,
         default=0.1,
         help="Assumed variance of the predicted Gaussian for regression tasks (default: 0.1)",
+    )
+    parser.add_argument(
+        "--no-transformer",
+        action="store_true",
+        help="If not to use transformer in prediction model",
     )
     args = parser.parse_args()
 
@@ -282,9 +287,12 @@ def main():
         val_dim=val_dim,
         inner_dim=inner_dim,
         dropout=dropout,
+        use_transformer=(not args.no_transformer)
     ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     init_iter = 0
+
+    print(model)
 
     trainer = Trainer(
         args,
