@@ -41,28 +41,28 @@ def main():
         type=int,
         default=635,
         metavar="N",
-        help="input batch size for training (default: 64)",
+        help="input batch size for training (default: 635)",
     )
     parser.add_argument(
         "--eval-batch-size",
         type=int,
         default=252,
         metavar="N",
-        help="input batch size for evaluation (default: 256)",
+        help="input batch size for evaluation (default: 252)",
     )
     parser.add_argument(
         "--iters",
         type=int,
         default=2000,
         metavar="N",
-        help="number of iterations to train (default: 10000)",
+        help="number of iterations to train (default: 2000)",
     )
     parser.add_argument(
         "--lr",
         type=float,
         default=0.0001,
         metavar="LR",  # 0.001, # 0.0001
-        help="learning rate (default: 0.001)",
+        help="learning rate (default: 0.0001)",
     )
     parser.add_argument(
         "--momentum",
@@ -118,7 +118,7 @@ def main():
         type=float,
         default=0.5,
         metavar="DROPOUT",
-        help="hyperparameter of convnet",
+        help="hyperparameter of convnet (default: 0.5)",
     )
     parser.add_argument(
         "--workers", type=int, default=8, metavar="W", help="number of CPU"
@@ -136,7 +136,8 @@ def main():
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2/data",
+        # default="/rap/jvb-000-aa/COURS2019/etudiants/submissions/b3phot2/data",
+        default="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
         help="directory where to find the data",
     )
     parser.add_argument(
@@ -218,7 +219,7 @@ def main():
     # train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
 
     train_labeled_dataset = horoma_dataset.HoromaDataset(
-        data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
+        data_dir=args.data_dir,
         split="train_labeled_overlapped",
         # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         transforms=HoromaTransforms(),
@@ -226,7 +227,7 @@ def main():
     )
 
     valid_dataset = horoma_dataset.HoromaDataset(
-        data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma/",
+        data_dir=args.data_dir,
         split="valid",
         # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(), transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103])]),
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
