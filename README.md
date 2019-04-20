@@ -65,10 +65,14 @@ For using this model use the details in [consistency_regularizer/README.md](cons
 ## Pretrained ResNet as feature-extractor
 
 Code for this model lies on git branch - `resnet`. We have left it unmerged as it is not our best performing model.
+This model follow same usage as given above by b2phot1.
+Sample config file - `resnet_clusters_kmeans.json` - can be found on the corresponding branch.
 
 ## Variational Deep Embedding (VADE) model
 
 Code for this model lies on git branch - `vade`. We have left it unmerged as it is not our best performing model.
+This model follow same usage as given above by b2phot1.
+Sample config file - `vade_clusters_kmeans.json` - can be found on the corresponding branch.
 
 ## Ladder Network model
 
