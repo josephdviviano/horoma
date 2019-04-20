@@ -114,6 +114,13 @@ def main():
         help="hyperparameter of VAT (default: 1)",
     )
     parser.add_argument(
+        "--dropout",
+        type=float,
+        default=0.5,
+        metavar="DROPOUT",
+        help="hyperparameter of convnet",
+    )
+    parser.add_argument(
         "--workers", type=int, default=8, metavar="W", help="number of CPU"
     )
     parser.add_argument(
@@ -268,7 +275,7 @@ def main():
     hidden_size = 256  # hyper-parameter # 128
     kernel_size = 2  # for CNN2D only
     pool_size = 2  # for CNN2D only
-    dropout = 0.5
+    dropout = args.dropout
     n_heads = 8  # 4
     key_dim = 128
     val_dim = 128
