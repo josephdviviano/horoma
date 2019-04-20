@@ -84,14 +84,30 @@ class HoromaDataset(Dataset):
             if subset is None:
                 pre_targets = pre_targets[skip:None]
             else:
-                pre_targets = pre_targets[skip : skip + subset]
+                pre_targets = pre_targets[skip:skip + subset]
 
-            self.map_labels = {'BJ': 0, 'BP': 1, 'CR': 2, 'EB': 3, 'EN': 4, 'EO': 5, 'ES': 6, 'EU': 7, 'FR': 8, 'HG': 9, 'PB': 10, 'PE': 11, 'PR': 12, 'PT': 13, 'PU': 14, 'SB': 15, 'TO': 16}
+            self.map_labels = {
+                "BJ": 0,
+                "BP": 1,
+                "CR": 2,
+                "EB": 3,
+                "EN": 4,
+                "EO": 5,
+                "ES": 6,
+                "EU": 7,
+                "FR": 8,
+                "HG": 9,
+                "PB": 10,
+                "PE": 11,
+                "PR": 12,
+                "PT": 13,
+                "PU": 14,
+                "SB": 15,
+                "TO": 16,
+            }
             # print(f"for {filename_y}, map_labels: \n{self.map_labels}")
-            self.targets = np.asarray(
-                [self.map_labels[k] for k in pre_targets]
-            )
-        self.labeled = (self.targets is not None)
+            self.targets = np.asarray([self.map_labels[k] for k in pre_targets])
+        self.labeled = self.targets is not None
 
         self.data = np.memmap(
             filename_x,
@@ -104,8 +120,8 @@ class HoromaDataset(Dataset):
             self.data = self.data[skip:None]
             self.region_ids = self.region_ids[skip:None]
         else:
-            self.data = self.data[skip : skip + subset]
-            self.region_ids = self.region_ids[skip : skip + subset]
+            self.data = self.data[skip:skip + subset]
+            self.region_ids = self.region_ids[skip:skip + subset]
 
         self.flattened = flattened
         self.return_doublon = return_doublon
@@ -222,7 +238,7 @@ class KFoldSplitDataset:
         n_split = int(self.split * len(dataset))
 
         unique_regions = np.concatenate(
-            [unique_regions[self.permutation :], unique_regions[: self.permutation]]
+            [unique_regions[self.permutation:], unique_regions[: self.permutation]]
         )
 
         cumsum = np.cumsum(unique_region_counts[unique_regions])

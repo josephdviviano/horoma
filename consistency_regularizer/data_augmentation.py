@@ -37,7 +37,9 @@ def transform_tensor_sample(x):
     # shift the series by 1 to 25 steps
     if np.random.random() > 0.5:
         shift = np.random.randint(1, 26)
-        x = torch.cat((x[:, shift:], x[:, :shift] + x[:, x.size(1) - 1] - x[:, 0]), dim=1)
+        x = torch.cat(
+            (x[:, shift:], x[:, :shift] + x[:, x.size(1) - 1] - x[:, 0]), dim=1
+        )
     # add partial gaussian noise 50% of the time
     if np.random.random() > 0.5:
 
@@ -64,5 +66,7 @@ def transform_tensor_sample(x):
 
 def noisy_sample(x):
     # return transform_tensor_sample(x)
-    return torch.cat([transform_tensor_sample(x[i:i + 1]) for i in range(x.size(0))], 0)
+    return torch.cat(
+        [transform_tensor_sample(x[i:i + 1]) for i in range(x.size(0))], 0
+    )
 

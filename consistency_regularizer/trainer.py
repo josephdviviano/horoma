@@ -133,7 +133,7 @@ class Trainer:
                 writer.add_scalar("Train/supervised_loss", supervised_loss, tbIndex)
                 writer.add_scalar("Train/reg_loss", reg_loss, tbIndex)
                 writer.add_scalar("Train/lds", self.args.alpha * lds, tbIndex)
-                
+
                 writer.add_scalar("Valid/Loss", val_mean_loss, tbIndex)
 
                 writer.add_scalar("Train_perf/f1_score", perfs[0].avg, tbIndex)
@@ -157,7 +157,7 @@ class Trainer:
                     "Valid_Metrics: {}\t".format(val_metrics),
                     "Best Perf: {}\t".format(best_val_metric),
                 )
-                print("-"*80)
+                print("-" * 80)
                 for a in sup_losses:
                     a.reset()
                 for a in perfs:
@@ -249,10 +249,7 @@ class Trainer:
 
             # print('loss_final: ', loss)
 
-            metrics = scoreF.scorePerformance(
-                treeId_pred,
-                treeId_true,
-            )
+            metrics = scoreF.scorePerformance(treeId_pred, treeId_true)
 
             for i in range(len(supervised_losses)):
                 sup_losses[i + 1].update(supervised_losses[i].item(), x_l.shape[0])

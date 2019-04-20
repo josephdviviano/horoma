@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class ScaledDotProductAttention(nn.Module):
-    ''' Scaled Dot-Product Attention '''
+    """ Scaled Dot-Product Attention """
 
     def __init__(self, temperature, attn_dropout=0.1):
         super().__init__()
@@ -28,7 +28,7 @@ class ScaledDotProductAttention(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    ''' Multi-Head Attention module '''
+    """ Multi-Head Attention module """
 
     def __init__(self, n_head, d_model, d_k, d_v, dropout=0.1):
         super().__init__()
@@ -82,7 +82,9 @@ class MultiHeadAttention(nn.Module):
         output, attn = self.attention(q, k, v, mask=mask)
 
         output = output.view(n_head, sz_b, len_q, d_v)
-        output = output.permute(1, 2, 0, 3).contiguous().view(sz_b, len_q, -1)  # b x lq x (n*dv)
+        output = (
+            output.permute(1, 2, 0, 3).contiguous().view(sz_b, len_q, -1)
+        )  # b x lq x (n*dv)
 
         output = self.dropout(self.fc(output))
         output = self.layer_norm(output + residual)
@@ -91,7 +93,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class MultiHeadTaskAttention(nn.Module):
-    ''' Multi-Head Attention module '''
+    """ Multi-Head Attention module """
 
     def __init__(self, n_head, d_model, d_k, d_v, dropout=0.1):
         super().__init__()
@@ -112,7 +114,7 @@ class MultiHeadTaskAttention(nn.Module):
 
 
 class PositionwiseFeedForward(nn.Module):
-    ''' A two-feed-forward-layer module '''
+    """ A two-feed-forward-layer module """
 
     def __init__(self, d_in, d_hid, dropout=0.1, d_out=None):
         super().__init__()
@@ -139,17 +141,30 @@ class PositionwiseFeedForward(nn.Module):
 
 
 class EncoderLayer(nn.Module):
-    ''' Compose with two layers '''
+    """ Compose with two layers """
 
-    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1, d_out=None, attn_flag=True):
+    def __init__(
+        self,
+        d_model,
+        d_inner,
+        n_head,
+        d_k,
+        d_v,
+        dropout=0.1,
+        d_out=None,
+        attn_flag=True,
+    ):
         super(EncoderLayer, self).__init__()
-        self.slf_attn = MultiHeadAttention(
-            n_head, d_model, d_k, d_v, dropout=dropout)
-        self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout, d_out=d_out)
+        self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
+        self.pos_ffn = PositionwiseFeedForward(
+            d_model, d_inner, dropout=dropout, d_out=d_out
+        )
         self.attn_flag = attn_flag
 
     def forward(self, enc_input, non_pad_mask=None, slf_attn_mask=None):
-        enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
+        enc_output, enc_slf_attn = self.slf_attn(
+            enc_input, enc_input, enc_input, mask=slf_attn_mask
+        )
 
         if non_pad_mask is not None:
             enc_output *= non_pad_mask
@@ -165,17 +180,32 @@ class EncoderLayer(nn.Module):
 
 
 class EncoderTaskLayer(nn.Module):
-    ''' Compose with two layers '''
+    """ Compose with two layers """
 
-    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1, d_out=None, attn_flag=True):
+    def __init__(
+        self,
+        d_model,
+        d_inner,
+        n_head,
+        d_k,
+        d_v,
+        dropout=0.1,
+        d_out=None,
+        attn_flag=True,
+    ):
         super(EncoderTaskLayer, self).__init__()
         self.slf_attn = MultiHeadTaskAttention(
-            n_head, d_model, d_k, d_v, dropout=dropout)
-        self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout, d_out=d_out)
+            n_head, d_model, d_k, d_v, dropout=dropout
+        )
+        self.pos_ffn = PositionwiseFeedForward(
+            d_model, d_inner, dropout=dropout, d_out=d_out
+        )
         self.attn_flag = attn_flag
 
     def forward(self, enc_input, slf_attn_mask=None):
-        enc_output, enc_slf_attn = self.slf_attn(0, enc_input, enc_input, mask=slf_attn_mask)
+        enc_output, enc_slf_attn = self.slf_attn(
+            0, enc_input, enc_input, mask=slf_attn_mask
+        )
 
         enc_output = self.pos_ffn(enc_output)
 
@@ -186,17 +216,30 @@ class EncoderTaskLayer(nn.Module):
 
 
 class EncoderTaskLayer2(nn.Module):
-    ''' Compose with two layers '''
+    """ Compose with two layers """
 
-    def __init__(self, d_model, d_inner, n_head, d_k, d_v, dropout=0.1, d_out=None, attn_flag=True):
+    def __init__(
+        self,
+        d_model,
+        d_inner,
+        n_head,
+        d_k,
+        d_v,
+        dropout=0.1,
+        d_out=None,
+        attn_flag=True,
+    ):
         super(EncoderTaskLayer2, self).__init__()
-        self.slf_attn = MultiHeadAttention(
-            n_head, d_model, d_k, d_v, dropout=dropout)
-        self.pos_ffn = PositionwiseFeedForward(d_model, d_inner, dropout=dropout, d_out=d_out)
+        self.slf_attn = MultiHeadAttention(n_head, d_model, d_k, d_v, dropout=dropout)
+        self.pos_ffn = PositionwiseFeedForward(
+            d_model, d_inner, dropout=dropout, d_out=d_out
+        )
         self.attn_flag = attn_flag
 
     def forward(self, enc_input, slf_attn_mask=None):
-        enc_output, enc_slf_attn = self.slf_attn(enc_input, enc_input, enc_input, mask=slf_attn_mask)
+        enc_output, enc_slf_attn = self.slf_attn(
+            enc_input, enc_input, enc_input, mask=slf_attn_mask
+        )
 
         enc_output = self.pos_ffn(enc_output)
 

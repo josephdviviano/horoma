@@ -200,7 +200,6 @@ def main():
     targets = args.targets
     targets = ",".join(targets)
 
-
     train_unlabeled_dataset = horoma_dataset.HoromaDataset(
         data_dir=args.data_dir,
         split="train",
@@ -233,7 +232,6 @@ def main():
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True, # set it true for 1D model
     )
-
 
     data_iterators = data_utils.get_iters(
         train_labeled_dataset,
@@ -283,7 +281,7 @@ def main():
     inner_dim = 128
 
     # model = models.TransformerNet( # 1d model
-    model = models.TransformerNet2D( # 2d model
+    model = models.TransformerNet2D(  # 2d model
         input_channels,
         out_size,
         hidden_size,
@@ -295,7 +293,7 @@ def main():
         val_dim=val_dim,
         inner_dim=inner_dim,
         dropout=dropout,
-        use_transformer=(not args.no_transformer)
+        use_transformer=(not args.no_transformer),
     ).to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     init_iter = 0

@@ -4,12 +4,7 @@ import torch.nn.functional as F
 
 
 class Preprocessor(nn.Module):
-
-    def __init__(
-            self,
-            ma_window_size=2,
-            mv_window_size=4,
-            num_samples_per_second=125):
+    def __init__(self, ma_window_size=2, mv_window_size=4, num_samples_per_second=125):
         # ma_window_size: (in seconds) window size to use
         #                 for moving average baseline wander removal
         # mv_window_size: (in seconds) window size to use
@@ -33,14 +28,17 @@ class Preprocessor(nn.Module):
 
             # Remove window mean and standard deviation
 
-            x = (x - torch.mean(x, dim=2, keepdim=True)) / \
-                (torch.std(x, dim=2, keepdim=True) + 0.00001)
+            x = (x - torch.mean(x, dim=2, keepdim=True)) / (
+                torch.std(x, dim=2, keepdim=True) + 0.00001
+            )
 
             # Moving average baseline wander removal
 
             x = x - F.avg_pool1d(
-                x, kernel_size=self.maKernelSize,
-                stride=1, padding=(self.maKernelSize - 1) // 2
+                x,
+                kernel_size=self.maKernelSize,
+                stride=1,
+                padding=(self.maKernelSize - 1) // 2,
             )
 
             # Moving RMS normalization
@@ -50,8 +48,11 @@ class Preprocessor(nn.Module):
                     F.avg_pool1d(
                         torch.pow(x, 2),
                         kernel_size=self.mvKernelSize,
-                        stride=1, padding=(self.mvKernelSize - 1) // 2
-                    )) + 0.00001
+                        stride=1,
+                        padding=(self.mvKernelSize - 1) // 2,
+                    )
+                )
+                + 0.00001
             )
 
         # Don't backpropagate further
