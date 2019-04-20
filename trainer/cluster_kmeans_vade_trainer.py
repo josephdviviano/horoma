@@ -14,10 +14,21 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
     requires the user to initialize the GMM before training.
     """
 
-    def __init__(self, model, optimizer, resume, config, unlabelled, labelled,
-                 helios_run, experiment_folder=None,
-                 n_clusters=20, kmeans_interval=0, kmeans_headstart=0,
-                 kmeans_weight=1):
+    def __init__(
+        self,
+        model,
+        optimizer,
+        resume,
+        config,
+        unlabelled,
+        labelled,
+        helios_run,
+        experiment_folder=None,
+        n_clusters=20,
+        kmeans_interval=0,
+        kmeans_headstart=0,
+        kmeans_weight=1,
+    ):
         """
         Initialize a cluster kmeans trainer for the Vade model.
 
@@ -38,12 +49,19 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         :param kmeans_weight: weight for the kmeans penalty
         """
         super(ClusterKMeansVadeTrainer, self).__init__(
-            model, optimizer, resume, config, unlabelled, labelled,
-            helios_run, experiment_folder)
+            model,
+            optimizer,
+            resume,
+            config,
+            unlabelled,
+            labelled,
+            helios_run,
+            experiment_folder,
+        )
 
         self.kmeans = ClusterModel(
             KMeans(n_clusters=n_clusters),
-            cluster_helper=self.cluster_collection.cluster_helper
+            cluster_helper=self.cluster_collection.cluster_helper,
         )
 
         self.kmeans_interval = kmeans_interval
@@ -66,7 +84,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         total_kmeans_loss = 0
         total_model_loss = 0
 
-        self.logger.info('K-Means Train Epoch: {}'.format(epoch))
+        self.logger.info("K-Means Train Epoch: {}".format(epoch))
 
         for batch_idx, (data) in enumerate(self.train_loader):
             start_it = time()
@@ -86,10 +104,10 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
                 # TODO: This will never be used with VaDE!
                 model_loss = self.model.loss(data, output)
 
-            centroids = torch.tensor(self.kmeans.model.cluster_centers_).to(
-                self.device)
-            clusters = torch.tensor(self.kmeans.predict(z.cpu().detach()),
-                                    dtype=torch.long).to(self.device)
+            centroids = torch.tensor(self.kmeans.model.cluster_centers_).to(self.device)
+            clusters = torch.tensor(
+                self.kmeans.predict(z.cpu().detach()), dtype=torch.long
+            ).to(self.device)
 
             closest_centroids = torch.index_select(centroids, 0, clusters)
 
@@ -101,7 +119,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             self.optimizer.step()
 
             step = epoch * len(self.train_loader) + batch_idx
-            self.tb_writer.add_scalar('train/loss', loss.item(), step)
+            self.tb_writer.add_scalar("train/loss", loss.item(), step)
 
             total_loss += loss.item()
             total_kmeans_loss += kmeans_loss.item()
@@ -111,32 +129,32 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             time_it = end_it - start_it
             if batch_idx % self.log_step == 0:
                 self.logger.info(
-                    '   > [{}/{} ({:.0f}%), {:.2f}s] '
-                    'Loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})'.format(
-                        batch_idx * self.train_loader.batch_size + data.size(
-                            0),
+                    "   > [{}/{} ({:.0f}%), {:.2f}s] "
+                    "Loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})".format(
+                        batch_idx * self.train_loader.batch_size + data.size(0),
                         len(self.train_loader.dataset),
                         100.0 * batch_idx / len(self.train_loader),
                         time_it * (len(self.train_loader) - batch_idx),
                         loss.item(),
                         model_loss.item(),
                         kmeans_loss.item(),
-                        self.kmeans_weight
-                    ))
+                        self.kmeans_weight,
+                    )
+                )
                 # grid = make_grid(data.cpu(), nrow=8, normalize=True)
                 # self.tb_writer.add_image('input', grid, step)
 
         self.logger.info(
-            '   > Total loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})'.format(
+            "   > Total loss: {:.6f} ({:.3f} + {:.3f} x {:.1f})".format(
                 total_loss / len(self.train_loader),
                 total_model_loss / len(self.train_loader),
                 total_kmeans_loss / len(self.train_loader),
-                self.kmeans_weight
-            ))
+                self.kmeans_weight,
+            )
+        )
 
         # We return the model loss for coherence
         return total_model_loss / len(self.train_loader)
-
 
     def _train_epoch(self, epoch):
         """
@@ -148,7 +166,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         self.model.train()
         total_loss = 0
 
-        self.logger.info('Train Epoch: {}'.format(epoch))
+        self.logger.info("Train Epoch: {}".format(epoch))
 
         for batch_idx, (data) in enumerate(self.train_loader):
             start_it = time()
@@ -165,7 +183,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             self.optimizer.step()
 
             step = epoch * len(self.train_loader) + batch_idx
-            self.tb_writer.add_scalar('train/loss', loss.item(), step)
+            self.tb_writer.add_scalar("train/loss", loss.item(), step)
             # self.comet_writer.log_metric('loss', loss.item(), step)
 
             total_loss += loss.item()
@@ -174,19 +192,20 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             time_it = end_it - start_it
             if batch_idx % self.log_step == 0:
                 self.logger.info(
-                    '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
-                        batch_idx * self.train_loader.batch_size + data.size(
-                            0),
+                    "   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} ".format(
+                        batch_idx * self.train_loader.batch_size + data.size(0),
                         len(self.train_loader.dataset),
                         100.0 * batch_idx / len(self.train_loader),
                         time_it * (len(self.train_loader) - batch_idx),
-                        loss.item()))
+                        loss.item(),
+                    )
+                )
                 # grid = make_grid(data.cpu(), nrow=8, normalize=True)
                 # self.tb_writer.add_image('input', grid, step)
 
-        self.logger.info('   > Total loss: {:.6f}'.format(
-            total_loss / len(self.train_loader)
-        ))
+        self.logger.info(
+            "   > Total loss: {:.6f}".format(total_loss / len(self.train_loader))
+        )
 
         return total_loss / len(self.train_loader)
 
@@ -200,7 +219,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         self.model.eval()
         total_loss = 0
 
-        self.logger.info('Valid Epoch: {}'.format(epoch))
+        self.logger.info("Valid Epoch: {}".format(epoch))
 
         for batch_idx, (data) in enumerate(self.valid_loader):
             start_it = time()
@@ -214,7 +233,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
                 loss = self.model.loss(data, output)
 
             step = epoch * len(self.valid_loader) + batch_idx
-            self.tb_writer.add_scalar('valid/loss', loss.item(), step)
+            self.tb_writer.add_scalar("valid/loss", loss.item(), step)
 
             total_loss += loss.item()
 
@@ -222,21 +241,22 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             time_it = end_it - start_it
             if batch_idx % self.log_step == 0:
                 self.logger.info(
-                    '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
-                        batch_idx * self.valid_loader.batch_size + data.size(
-                            0),
+                    "   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} ".format(
+                        batch_idx * self.valid_loader.batch_size + data.size(0),
                         len(self.valid_loader.dataset),
                         100.0 * batch_idx / len(self.valid_loader),
                         time_it * (len(self.valid_loader) - batch_idx),
-                        loss.item()))
+                        loss.item(),
+                    )
+                )
                 # grid = make_grid(data.cpu(), nrow=8, normalize=True)
                 # self.tb_writer.add_image('input', grid, step)
 
-        self.logger.info('   > Total loss: {:.6f}'.format(
-            total_loss / len(self.valid_loader)
-        ))
+        self.logger.info(
+            "   > Total loss: {:.6f}".format(total_loss / len(self.valid_loader))
+        )
 
-        return(total_loss / len(self.valid_loader))
+        return total_loss / len(self.valid_loader)
 
     def _valid_epoch(self, epoch):
         """
@@ -253,11 +273,10 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         other_metrics = self.cluster_collection.get_clustering_metrics()
 
         for key, value in other_metrics.items():
-            model, metric = key.split('-')
-            self.tb_writer.add_scalar('{}/{}'.format(model, metric), value,
-                                      epoch)
+            model, metric = key.split("-")
+            self.tb_writer.add_scalar("{}/{}".format(model, metric), value, epoch)
 
-        return(loss, other_metrics)
+        return (loss, other_metrics)
 
     def train(self):
         """
@@ -268,7 +287,7 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
         # pre-training as a normal vae
         self.model.train()
         for epoch in range(2):
-            print('pretrain epoch {}'.format(epoch))
+            print("pretrain epoch {}".format(epoch))
             for batch_idx, data in enumerate(self.train_loader):
 
                 data = data.to(self.device)
@@ -285,9 +304,10 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
 
         for epoch in range(self.start_epoch, self.epochs):
 
-            if epoch % (
-                    self.kmeans_interval + 1) == 0 \
-                    and epoch >= self.kmeans_headstart:
+            if (
+                epoch % (self.kmeans_interval + 1) == 0
+                and epoch >= self.kmeans_headstart
+            ):
                 train_loss = self._train_epoch_kmeans(epoch)
             else:
                 train_loss = self._train_epoch(epoch)
@@ -301,9 +321,10 @@ class ClusterKMeansVadeTrainer(ClusterTrainer):
             time_elapsed = time() - t0
 
             # Break the loop if there is no more time left
-            if time_elapsed * (1 + 1 / (
-                    epoch - self.start_epoch + 1)) > .95 \
-                    * self.wall_time * 3600:
+            if (
+                time_elapsed * (1 + 1 / (epoch - self.start_epoch + 1))
+                > 0.95 * self.wall_time * 3600
+            ):
                 break
 
         # Save the checkpoint if it's not already done.

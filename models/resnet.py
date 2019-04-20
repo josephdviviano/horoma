@@ -2,15 +2,26 @@ import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
 import torch.utils.model_zoo as model_zoo
-#from torchvision.models.resnet import ResNet, BasicBlock
 
-model_urls = {'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
-             'resnet34': 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'}
+# from torchvision.models.resnet import ResNet, BasicBlock
+
+model_urls = {
+    "resnet18": "https://download.pytorch.org/models/resnet18-5c106cde.pth",
+    "resnet34": "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
+}
+
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1):
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, groups=groups, bias=False)
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=1,
+        groups=groups,
+        bias=False,
+    )
 
 
 def conv1x1(in_planes, out_planes, stride=1):
@@ -21,13 +32,21 @@ def conv1x1(in_planes, out_planes, stride=1):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, norm_layer=None):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        groups=1,
+        base_width=64,
+        norm_layer=None,
+    ):
         super(BasicBlock, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_width != 64:
-            raise ValueError('BasicBlock only supports groups=1 and base_width=64')
+            raise ValueError("BasicBlock only supports groups=1 and base_width=64")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
@@ -59,12 +78,20 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, norm_layer=None):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        groups=1,
+        base_width=64,
+        norm_layer=None,
+    ):
         super(Bottleneck, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
-        width = int(planes * (base_width / 64.)) * groups
+        width = int(planes * (base_width / 64.0)) * groups
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(inplanes, width)
         self.bn1 = norm_layer(width)
@@ -100,9 +127,16 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
-                 groups=1, width_per_group=64, norm_layer=None):
+    def __init__(
+        self,
+        block,
+        layers,
+        num_classes=1000,
+        zero_init_residual=False,
+        groups=1,
+        width_per_group=64,
+        norm_layer=None,
+    ):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -110,21 +144,28 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(
+            3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], norm_layer=norm_layer)
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, norm_layer=norm_layer)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, norm_layer=norm_layer)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, norm_layer=norm_layer)
+        self.layer2 = self._make_layer(
+            block, 128, layers[1], stride=2, norm_layer=norm_layer
+        )
+        self.layer3 = self._make_layer(
+            block, 256, layers[2], stride=2, norm_layer=norm_layer
+        )
+        self.layer4 = self._make_layer(
+            block, 512, layers[3], stride=2, norm_layer=norm_layer
+        )
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -150,15 +191,31 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, norm_layer))
+        layers.append(
+            block(
+                self.inplanes,
+                planes,
+                stride,
+                downsample,
+                self.groups,
+                self.base_width,
+                norm_layer,
+            )
+        )
         self.inplanes = planes * block.expansion
         for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, norm_layer=norm_layer))
+            layers.append(
+                block(
+                    self.inplanes,
+                    planes,
+                    groups=self.groups,
+                    base_width=self.base_width,
+                    norm_layer=norm_layer,
+                )
+            )
 
         return nn.Sequential(*layers)
-    
+
     def feature_extract(self, x):
         with torch.no_grad():
             x = self.conv1(x)
@@ -174,10 +231,9 @@ class ResNet(nn.Module):
             x = self.avgpool(x)
             features = x.view(x.size(0), -1)
         return features
-            
 
     def forward(self, features):
-        
+
         outputs = self.fc(features)
 
         return outputs
@@ -186,15 +242,37 @@ class ResNet(nn.Module):
 class ResNet18(ResNet):
     def __init__(self, num_classes=17):
         super(ResNet18, self).__init__(BasicBlock, [2, 2, 2, 2])
-        self.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+        self.load_state_dict(model_zoo.load_url(model_urls["resnet18"]))
 
         # Freeze dem weights.
         for param in self.parameters():
             param.requires_grad = False
 
         self.fc = nn.Linear(512, num_classes)
-        self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
-    
+        self.crossentropy = CrossEntropyLoss(
+            weight=torch.tensor(
+                [
+                    3.797049153371664,
+                    2.9623605497447008,
+                    1.611298036468296,
+                    3.43174195631091,
+                    3.9992895148743295,
+                    1.8954284483805277,
+                    0.1553497386864832,
+                    0.9593591633310533,
+                    1.6456965303961806,
+                    0.88036092363079,
+                    3.672995369869318,
+                    1.52783087478394,
+                    2.877434609539806,
+                    0.6857456581685869,
+                    1.5306280831565733,
+                    3.627337111654075,
+                    0.28470263288250225,
+                ]
+            )
+        )
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
@@ -228,31 +306,53 @@ class ResNet18(ResNet):
 
 
 class ResNet18_Ens(ResNet):
-    def __init__(self, num_classes=17, num_heads = 10):
-        super(ResNet18_Ens, self).__init__(BasicBlock,  [2, 2, 2, 2])
-        self.load_state_dict(model_zoo.load_url(model_urls['resne18']))
+    def __init__(self, num_classes=17, num_heads=10):
+        super(ResNet18_Ens, self).__init__(BasicBlock, [2, 2, 2, 2])
+        self.load_state_dict(model_zoo.load_url(model_urls["resne18"]))
 
         # Freeze dem weights.
         for param in self.parameters():
             param.requires_grad = False
-            
+
         self.num_heads = num_heads
-        
+
         for i in range(self.num_heads):
-            setattr(self, "head{}".format(i),  nn.Linear(512, num_classes))
+            setattr(self, "head{}".format(i), nn.Linear(512, num_classes))
         self.curr_head = 0
         self.change_head(self.curr_head)
 
-        self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
+        self.crossentropy = CrossEntropyLoss(
+            weight=torch.tensor(
+                [
+                    3.797049153371664,
+                    2.9623605497447008,
+                    1.611298036468296,
+                    3.43174195631091,
+                    3.9992895148743295,
+                    1.8954284483805277,
+                    0.1553497386864832,
+                    0.9593591633310533,
+                    1.6456965303961806,
+                    0.88036092363079,
+                    3.672995369869318,
+                    1.52783087478394,
+                    2.877434609539806,
+                    0.6857456581685869,
+                    1.5306280831565733,
+                    3.627337111654075,
+                    0.28470263288250225,
+                ]
+            )
+        )
         self.num_classes = num_classes
-                    
+
     def change_head(self, head_number):
         if 0 <= head_number < self.num_heads:
             self.curr_head = head_number
             self.fc = getattr(self, "head{}".format(head_number))
         else:
             print("change_head failed, current head is still {}".format(self.curr_head))
-                    
+
     def loss(self, x, label):
         """
         Loss logic for the Vanilla AE.
@@ -266,48 +366,77 @@ class ResNet18_Ens(ResNet):
         loss = self.crossentropy(x, label)
 
         return loss
-    
-    def ensemble_predict(self, features, mode = "hard"):
-        soft_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
-        hard_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
+
+    def ensemble_predict(self, features, mode="hard"):
+        soft_predictions = torch.zeros(
+            self.num_heads, features.size(0), self.num_classes
+        )
+        hard_predictions = torch.zeros(
+            self.num_heads, features.size(0), self.num_classes
+        )
         for i in range(self.num_heads):
             self.change_head(i)
-            soft_predictions[i,:,:] = self.fc(features)
-            max_predictions, _ = torch.max(soft_predictions[i,:,:],dim=1)
-            hard_predictions[i,:,:] = (soft_predictions[i,:,:] == max_predictions.view(-1,1))
-        hard_vote = torch.argmax(torch.mean(hard_predictions,dim=0),dim=1)
-        soft_vote = torch.argmax(torch.mean(soft_predictions,dim=0),dim=1)
+            soft_predictions[i, :, :] = self.fc(features)
+            max_predictions, _ = torch.max(soft_predictions[i, :, :], dim=1)
+            hard_predictions[i, :, :] = soft_predictions[
+                i, :, :
+            ] == max_predictions.view(-1, 1)
+        hard_vote = torch.argmax(torch.mean(hard_predictions, dim=0), dim=1)
+        soft_vote = torch.argmax(torch.mean(soft_predictions, dim=0), dim=1)
         if mode == "hard":
             return hard_vote
         elif mode == "soft":
             return soft_vote
-        
+
+
 class ResNet34_Ens(ResNet):
-    def __init__(self, num_classes=17, num_heads = 10):
-        super(ResNet34_Ens, self).__init__(BasicBlock,  [3, 4, 6, 3])
-        self.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
+    def __init__(self, num_classes=17, num_heads=10):
+        super(ResNet34_Ens, self).__init__(BasicBlock, [3, 4, 6, 3])
+        self.load_state_dict(model_zoo.load_url(model_urls["resnet34"]))
 
         # Freeze dem weights.
         for param in self.parameters():
             param.requires_grad = False
-            
+
         self.num_heads = num_heads
-        
+
         for i in range(self.num_heads):
-            setattr(self, "head{}".format(i),  nn.Linear(512, num_classes))
+            setattr(self, "head{}".format(i), nn.Linear(512, num_classes))
         self.curr_head = 0
         self.change_head(self.curr_head)
 
-        self.crossentropy = CrossEntropyLoss(weight=torch.tensor([3.797049153371664, 2.9623605497447008, 1.611298036468296, 3.43174195631091, 3.9992895148743295, 1.8954284483805277, 0.1553497386864832, 0.9593591633310533, 1.6456965303961806, 0.88036092363079, 3.672995369869318, 1.52783087478394, 2.877434609539806, 0.6857456581685869, 1.5306280831565733, 3.627337111654075, 0.28470263288250225]))
+        self.crossentropy = CrossEntropyLoss(
+            weight=torch.tensor(
+                [
+                    3.797049153371664,
+                    2.9623605497447008,
+                    1.611298036468296,
+                    3.43174195631091,
+                    3.9992895148743295,
+                    1.8954284483805277,
+                    0.1553497386864832,
+                    0.9593591633310533,
+                    1.6456965303961806,
+                    0.88036092363079,
+                    3.672995369869318,
+                    1.52783087478394,
+                    2.877434609539806,
+                    0.6857456581685869,
+                    1.5306280831565733,
+                    3.627337111654075,
+                    0.28470263288250225,
+                ]
+            )
+        )
         self.num_classes = num_classes
-                    
+
     def change_head(self, head_number):
         if 0 <= head_number < self.num_heads:
             self.curr_head = head_number
             self.fc = getattr(self, "head{}".format(head_number))
         else:
             print("change_head failed, current head is still {}".format(self.curr_head))
-                    
+
     def loss(self, x, label):
         """
         Loss logic for the Vanilla AE.
@@ -321,21 +450,25 @@ class ResNet34_Ens(ResNet):
         loss = self.crossentropy(x, label)
 
         return loss
-    
-    def ensemble_predict(self, features, mode = "hard"):
-        soft_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
-        hard_predictions = torch.zeros(self.num_heads, features.size(0), self.num_classes)
+
+    def ensemble_predict(self, features, mode="hard"):
+        soft_predictions = torch.zeros(
+            self.num_heads, features.size(0), self.num_classes
+        )
+        hard_predictions = torch.zeros(
+            self.num_heads, features.size(0), self.num_classes
+        )
         for i in range(self.num_heads):
             self.change_head(i)
-            soft_predictions[i,:,:] = self.fc(features)
-            max_predictions, _ = torch.max(soft_predictions[i,:,:],dim=1)
-            hard_predictions[i,:,:] = (soft_predictions[i,:,:] == max_predictions.view(-1,1))
-        hard_vote = torch.argmax(torch.mean(hard_predictions,dim=0),dim=1)
-        soft_vote = torch.argmax(torch.mean(soft_predictions,dim=0),dim=1)
+            soft_predictions[i, :, :] = self.fc(features)
+            max_predictions, _ = torch.max(soft_predictions[i, :, :], dim=1)
+            hard_predictions[i, :, :] = soft_predictions[
+                i, :, :
+            ] == max_predictions.view(-1, 1)
+        hard_vote = torch.argmax(torch.mean(hard_predictions, dim=0), dim=1)
+        soft_vote = torch.argmax(torch.mean(soft_predictions, dim=0), dim=1)
         if mode == "hard":
             return hard_vote
         elif mode == "soft":
             return soft_vote
-            
-        
 
