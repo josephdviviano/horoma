@@ -6,6 +6,7 @@ from utils.dataset import SplitDataset
 import numpy as np
 import torch
 
+
 class SupervisedTrainer(BaseTrainer):
     """
     Trainer class
@@ -14,8 +15,17 @@ class SupervisedTrainer(BaseTrainer):
         Inherited from BaseTrainer.
     """
 
-    def __init__(self, model, optimizer, resume, config,
-                 unlabelled, helios_run, experiment_folder=None, **kwargs):
+    def __init__(
+        self,
+        model,
+        optimizer,
+        resume,
+        config,
+        unlabelled,
+        helios_run,
+        experiment_folder=None,
+        **kwargs
+    ):
         """
         Initialize the trainer.
 
@@ -29,8 +39,9 @@ class SupervisedTrainer(BaseTrainer):
         and save checkpoints (used for hyperparamter search).
         :param kwargs: additional arguments if necessary
         """
-        super(SupervisedTrainer, self).__init__(model, optimizer, resume, config,
-                                      helios_run, experiment_folder)
+        super(SupervisedTrainer, self).__init__(
+            model, optimizer, resume, config, helios_run, experiment_folder
+        )
         self.config = config
 
         ############################################
@@ -38,7 +49,7 @@ class SupervisedTrainer(BaseTrainer):
         ############################################
 
         # Splitting 9:1 by default
-        split = config['data']['dataloader'].get('split', .9)
+        split = config["data"]["dataloader"].get("split", 0.9)
 
         splitter = SplitDataset(split)
 
@@ -49,21 +60,15 @@ class SupervisedTrainer(BaseTrainer):
         ############################################
 
         train_loader = DataLoader(
-            dataset=train_set,
-            **config['data']['dataloader']['train'],
-            pin_memory=True
+            dataset=train_set, **config["data"]["dataloader"]["train"], pin_memory=True
         )
 
         valid_loader = DataLoader(
-            dataset=valid_set,
-            **config['data']['dataloader']['valid'],
-            pin_memory=True
+            dataset=valid_set, **config["data"]["dataloader"]["valid"], pin_memory=True
         )
 
-        print(
-            '>> Total batch number for training: {}'.format(len(train_loader)))
-        print('>> Total batch number for validation: {}'.format(
-            len(valid_loader)))
+        print(">> Total batch number for training: {}".format(len(train_loader)))
+        print(">> Total batch number for validation: {}".format(len(valid_loader)))
         print()
 
         self.train_loader = train_loader
@@ -81,7 +86,7 @@ class SupervisedTrainer(BaseTrainer):
         total_loss = 0
         total_f1 = 0
 
-        self.logger.info('Train Epoch: {}'.format(epoch))
+        self.logger.info("Train Epoch: {}".format(epoch))
 
         for batch_idx, (X, y) in enumerate(self.train_loader):
             start_it = time()
@@ -96,19 +101,22 @@ class SupervisedTrainer(BaseTrainer):
             self.optimizer.step()
 
             step = epoch * len(self.train_loader) + batch_idx
-            self.tb_writer.add_scalar('train/loss', loss.item(), step)
+            self.tb_writer.add_scalar("train/loss", loss.item(), step)
             # self.comet_writer.log_metric('loss', loss.item(), step)
 
             total_loss += loss.item()
 
             _, pred = torch.max(output, 1)
-            f1 = f1_score(pred.data.cpu().numpy(),
-                y.squeeze().data.cpu().numpy(), average='weighted')
+            f1 = f1_score(
+                pred.data.cpu().numpy(),
+                y.squeeze().data.cpu().numpy(),
+                average="weighted",
+            )
             total_f1 += f1
 
             end_it = time()
             time_it = end_it - start_it
-            #if batch_idx % self.log_step == 0:
+            # if batch_idx % self.log_step == 0:
             #    self.logger.info(
             #        '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} '.format(
             #            batch_idx * self.train_loader.batch_size + X.size(
@@ -118,10 +126,11 @@ class SupervisedTrainer(BaseTrainer):
             #            time_it * (len(self.train_loader) - batch_idx),
             #            loss.item()))
 
-        self.logger.info('   > Total loss: {:.6f} Total F1: {:.6f}'.format(
-            total_loss / len(self.train_loader),
-            total_f1 / len(self.train_loader)
-        ))
+        self.logger.info(
+            "   > Total loss: {:.6f} Total F1: {:.6f}".format(
+                total_loss / len(self.train_loader), total_f1 / len(self.train_loader)
+            )
+        )
 
         return total_loss / len(self.train_loader)
 
@@ -136,7 +145,7 @@ class SupervisedTrainer(BaseTrainer):
         total_loss = 0
         total_f1 = 0
 
-        self.logger.info('Valid Epoch: {}'.format(epoch))
+        self.logger.info("Valid Epoch: {}".format(epoch))
 
         for batch_idx, (X, y) in enumerate(self.valid_loader):
             start_it = time()
@@ -151,18 +160,21 @@ class SupervisedTrainer(BaseTrainer):
 
             # F1 score
             _, pred = torch.max(output, 1)
-            f1 = f1_score(pred.data.cpu().numpy(),
-                y.squeeze().data.cpu().numpy(), average='weighted')
+            f1 = f1_score(
+                pred.data.cpu().numpy(),
+                y.squeeze().data.cpu().numpy(),
+                average="weighted",
+            )
             total_f1 += f1
 
             step = epoch * len(self.valid_loader) + batch_idx
-            self.tb_writer.add_scalar('valid/loss', loss.item(), step)
+            self.tb_writer.add_scalar("valid/loss", loss.item(), step)
 
-            MSG = '   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} F1: {:.6f}'
+            MSG = "   > [{}/{} ({:.0f}%), {:.2f}s] Loss: {:.6f} F1: {:.6f}"
 
             end_it = time()
             time_it = end_it - start_it
-            #if batch_idx % self.log_step == 0:
+            # if batch_idx % self.log_step == 0:
             #    self.logger.info(MSG.format(
             #        batch_idx * self.valid_loader.batch_size + X.size(0),
             #        len(self.valid_loader.dataset),
@@ -171,8 +183,10 @@ class SupervisedTrainer(BaseTrainer):
             #        loss.item(),
             #        f1))
 
-        self.logger.info('   > Total loss: {:.6f}, Total F1: {:.6f}'.format(
-            total_loss / len(self.valid_loader),
-            total_f1 / len(self.valid_loader)))
+        self.logger.info(
+            "   > Total loss: {:.6f}, Total F1: {:.6f}".format(
+                total_loss / len(self.valid_loader), total_f1 / len(self.valid_loader)
+            )
+        )
 
         return total_loss / len(self.valid_loader)

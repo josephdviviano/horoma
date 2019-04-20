@@ -20,7 +20,7 @@ import torchvision
 
 PAD = 0
 STRIDE = 1
-LOG2PI = math.log(2*math.pi)
+LOG2PI = math.log(2 * math.pi)
 EPS = 1e-10
 CUDA = torch.cuda.is_available()
 
@@ -30,12 +30,20 @@ class VaDE(nn.Module):
     model_hyperparameters_space = [
         Integer(2, 75, name="z_dim"),
         Integer(7, 150, name="n_centroids"),
-        Real(0.1, 0.5, name="dropout")
+        Real(0.1, 0.5, name="dropout"),
     ]
 
-    def __init__(self, z_dim=10, n_centroids=10, dropout=0.1,
-                 cnn1_out_channels=10, cnn2_out_channels=20, cnn_kernel_size=5,
-                 lin2_in_channels=50, maxpool_kernel=2):
+    def __init__(
+        self,
+        z_dim=10,
+        n_centroids=10,
+        dropout=0.1,
+        cnn1_out_channels=10,
+        cnn2_out_channels=20,
+        cnn_kernel_size=5,
+        lin2_in_channels=50,
+        maxpool_kernel=2,
+    ):
         super(self.__class__, self).__init__()
 
         # Save settings for later.
@@ -48,9 +56,11 @@ class VaDE(nn.Module):
 
         # Architecture copied from best performing model, conv_ae.py
         self.last_w = self._calc_output_size(
-            IMAGE_W, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
+            IMAGE_W, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2
+        )
         self.last_h = self._calc_output_size(
-            IMAGE_H, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2)
+            IMAGE_H, cnn_kernel_size, PAD, STRIDE, maxpool_kernel, n_levels=2
+        )
 
         self.encoder_cnn = nn.Sequential(
             nn.Conv2d(INPUT_CHANNELS, cnn1_out_channels, cnn_kernel_size),
@@ -60,14 +70,15 @@ class VaDE(nn.Module):
             nn.Conv2d(cnn1_out_channels, self.cnn2_out_channels, cnn_kernel_size),
             self.maxpool,
             self.activation,
-            self.dropout
+            self.dropout,
         )
 
         self.encoder_mlp = nn.Sequential(
             nn.Linear(
-                self.cnn2_out_channels * self.last_w * self.last_h, lin2_in_channels),
+                self.cnn2_out_channels * self.last_w * self.last_h, lin2_in_channels
+            ),
             self.activation,
-            self.dropout
+            self.dropout,
         )
 
         # Encoding to the prior.
@@ -79,35 +90,35 @@ class VaDE(nn.Module):
             self.activation,
             self.dropout,
             nn.Linear(
-                lin2_in_channels, self.cnn2_out_channels * self.last_w * self.last_h),
+                lin2_in_channels, self.cnn2_out_channels * self.last_w * self.last_h
+            ),
             self.activation,
-            self.dropout
+            self.dropout,
         )
 
         # Transposed convolutions for decoder.
         self.decoder_cnn = nn.Sequential(
             nn.MaxUnpool2d(maxpool_kernel),
             nn.ConvTranspose2d(
-                self.cnn2_out_channels, cnn1_out_channels, cnn_kernel_size),
+                self.cnn2_out_channels, cnn1_out_channels, cnn_kernel_size
+            ),
             self.activation,
             self.dropout,
             nn.MaxUnpool2d(maxpool_kernel),
-            nn.ConvTranspose2d(
-                cnn1_out_channels, INPUT_CHANNELS, cnn_kernel_size),
-            nn.Sigmoid()
+            nn.ConvTranspose2d(cnn1_out_channels, INPUT_CHANNELS, cnn_kernel_size),
+            nn.Sigmoid(),
         )
 
-        #self.decoder = nn.Sequential(
+        # self.decoder = nn.Sequential(
         #    nn.Linear(self.z_dim, self.cnn2_out_channels * last_w * last_h),
         #    self.activation,
         #    nn.Linear(self.cnn2_out_channels * last_w * last_h,
         #              IMAGE_SIZE * INPUT_CHANNELS)
-        #)
+        # )
 
         self.create_gmm_param()
 
-    def _calc_output_size(self, width, kernel, pad, stride, pool,
-                          level=1, n_levels=1):
+    def _calc_output_size(self, width, kernel, pad, stride, pool, level=1, n_levels=1):
         """
         Recursively calculates the output image width / height given a square
         input. Assumes the same padding, kernel size, and stride were applied
@@ -116,20 +127,21 @@ class VaDE(nn.Module):
         assert level <= n_levels
         assert level > 0 and n_levels > 0
 
-        out = int(((width - kernel + (2*pad) / stride) + 1) / pool)
+        out = int(((width - kernel + (2 * pad) / stride) + 1) / pool)
 
         if level < n_levels:
-            out = self._calc_output_size(out, kernel, pad, stride, pool,
-                                         level=level+1, n_levels=n_levels)
+            out = self._calc_output_size(
+                out, kernel, pad, stride, pool, level=level + 1, n_levels=n_levels
+            )
 
-        return(out)
+        return out
 
     def _get_t_2d(self, z):
         """Gaussian weights for z. TODO: currently shrinks to zero."""
         z_x = z.size()[0]
         t_2d = self.t_p.unsqueeze(0).expand(z_x, self.n_centroids)
 
-        return(t_2d)
+        return t_2d
 
     def _get_u_3d(self, z):
         """Means of GMM."""
@@ -138,7 +150,7 @@ class VaDE(nn.Module):
         u_p_y = self.u_p.size()[1]
         u_3d = self.u_p.unsqueeze(0).expand(z_x, u_p_x, u_p_y)
 
-        return(u_3d)
+        return u_3d
 
     def _get_l_3d(self, z):
         """Covs of GMM."""
@@ -147,7 +159,7 @@ class VaDE(nn.Module):
         l_p_y = self.l_p.size()[1]
         l_3d = self.l_p.unsqueeze(0).expand(z_x, l_p_x, l_p_y)
 
-        return(l_3d)
+        return l_3d
 
     def _get_z_mu_t(self, z_mu):
         """Get means of latent."""
@@ -155,7 +167,7 @@ class VaDE(nn.Module):
         z_mu_y = z_mu.size()[1]
         z_mu_t = z_mu.unsqueeze(2).expand(z_mu_x, z_mu_y, self.n_centroids)
 
-        return(z_mu_t)
+        return z_mu_t
 
     def _get_z_lv_t(self, z_lv):
         """Get log variances of latent."""
@@ -163,8 +175,7 @@ class VaDE(nn.Module):
         z_lv_y = z_lv.size()[1]
         z_lv_t = z_lv.unsqueeze(2).expand(z_lv_x, z_lv_y, self.n_centroids)
 
-        return(z_lv_t)
-
+        return z_lv_t
 
     def _get_gamma(self, z, z_mu, z_lv):
         """
@@ -188,28 +199,31 @@ class VaDE(nn.Module):
         # also see eq. 2.192 from Bishop 2006.
         t_2d = self._get_t_2d(z)
         p_c = torch.log(t_2d)
-        p_z_c = 0.5*torch.log(2*math.pi*l_3d) + (Z-u_3d)**2/(2*l_3d)
+        p_z_c = 0.5 * torch.log(2 * math.pi * l_3d) + (Z - u_3d) ** 2 / (2 * l_3d)
         p_c_z = torch.exp(p_c - torch.sum(p_z_c, dim=1)) + EPS
 
         gamma = p_c_z / torch.sum(p_c_z, dim=1, keepdim=True)
 
-        return(gamma)
+        return gamma
 
     def _log_pz_samples(samples):
         """Log liklihood of samples from the prior."""
-        return(-0.5*LOG2PI*samples.size()[1] - torch.sum(0.5*(samples)**2, 1))
+        return -0.5 * LOG2PI * samples.size()[1] - torch.sum(0.5 * (samples) ** 2, 1)
 
     def _log_qz_samples(samples, mu, logvar):
         """Log likelihood of samples from the posterior."""
-        return(-0.5*LOG2PI*samples.size()[1] - torch.sum(
-            0.5*(samples-mu)**2/torch.exp(logvar) + 0.5*logvar, 1))
+        return -0.5 * LOG2PI * samples.size()[1] - torch.sum(
+            0.5 * (samples - mu) ** 2 / torch.exp(logvar) + 0.5 * logvar, 1
+        )
 
     def _calc_bce(self, recon_x, x):
         bce = -torch.sum(
-            x*torch.log(torch.clamp(recon_x, min=EPS)) +
-            (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), dim=[1,2,3])
+            x * torch.log(torch.clamp(recon_x, min=EPS))
+            + (1 - x) * torch.log(torch.clamp(1 - recon_x, min=EPS)),
+            dim=[1, 2, 3],
+        )
 
-        return(bce)
+        return bce
 
     def create_gmm_param(self):
         """
@@ -218,16 +232,19 @@ class VaDE(nn.Module):
         l_p = Covariances of GMM.
         """
         # TODO: Differen't weights for each Gaussian?
-        self.t_p = nn.Parameter(torch.ones(
-            self.n_centroids)/self.n_centroids, requires_grad=False)
+        self.t_p = nn.Parameter(
+            torch.ones(self.n_centroids) / self.n_centroids, requires_grad=False
+        )
 
         # Means of GMM
-        self.u_p = nn.Parameter(torch.zeros(
-            self.z_dim, self.n_centroids), requires_grad=False)
+        self.u_p = nn.Parameter(
+            torch.zeros(self.z_dim, self.n_centroids), requires_grad=False
+        )
 
         # Covariances of GMM
-        self.l_p = nn.Parameter(torch.ones(
-            self.z_dim, self.n_centroids), requires_grad=False)
+        self.l_p = nn.Parameter(
+            torch.ones(self.z_dim, self.n_centroids), requires_grad=False
+        )
 
     def initialize_gmm(self, dataloader):
         """
@@ -244,7 +261,7 @@ class VaDE(nn.Module):
 
         # Get a collection of latent variables to fit the GMM to.
         for batch_idx, inputs in enumerate(dataloader):
-            #inputs = inputs.view(inputs.size(0), -1).float()
+            # inputs = inputs.view(inputs.size(0), -1).float()
 
             if CUDA:
                 inputs = inputs.cuda()
@@ -256,13 +273,10 @@ class VaDE(nn.Module):
         data = np.concatenate(data)
 
         # Fit the GMM, saving the means and covariances for each gaussian.
-        gmm = GaussianMixture(
-            n_components=self.n_centroids, covariance_type='diag')
+        gmm = GaussianMixture(n_components=self.n_centroids, covariance_type="diag")
         gmm.fit(data)
-        self.u_p.data.copy_(torch.from_numpy(
-            gmm.means_.T.astype(np.float32)))
-        self.l_p.data.copy_(torch.from_numpy(
-            gmm.covariances_.T.astype(np.float32)))
+        self.u_p.data.copy_(torch.from_numpy(gmm.means_.T.astype(np.float32)))
+        self.l_p.data.copy_(torch.from_numpy(gmm.covariances_.T.astype(np.float32)))
 
     def forward(self, x):
         """
@@ -274,7 +288,7 @@ class VaDE(nn.Module):
         """
         z, mu, logvar, maxpool_indices = self.encode(x)
         x_recon = self.decode(z, maxpool_indices)
-        return(x_recon, x, z, mu, logvar)
+        return (x_recon, x, z, mu, logvar)
 
     def encode(self, x):
         """Encode x into latent z."""
@@ -298,27 +312,23 @@ class VaDE(nn.Module):
         # Generate latent layer.
         z = self.reparameterize(mu, logvar)
 
-        return(z, mu, logvar, indices)
+        return (z, mu, logvar, indices)
 
     def reparameterize(self, mu, lv):
         """
         Reparameterizion trick to get the mean and log variance of the encoder.
         """
         if self.training:
-          std = lv.mul(0.5).exp_()
-          eps = Variable(std.data.new(std.size()).normal_())
-          return(eps.mul(std).add_(mu))
+            std = lv.mul(0.5).exp_()
+            eps = Variable(std.data.new(std.size()).normal_())
+            return eps.mul(std).add_(mu)
         else:
-          return(mu)
+            return mu
 
     def decode(self, z, indices):
         """Reconstruct x from latent z."""
         hid = self.decoder_mlp(z)
-        hid = hid.view([hid.size(0),
-                        self.cnn2_out_channels,
-                        self.last_w,
-                        self.last_h]
-        )
+        hid = hid.view([hid.size(0), self.cnn2_out_channels, self.last_w, self.last_h])
 
         # Loop through CNN decoder to apply the indices for MaxUnpoolng
         indices = list(reversed(indices))
@@ -331,7 +341,7 @@ class VaDE(nn.Module):
             else:
                 hid = layer(hid)
 
-        return(hid)
+        return hid
 
     def vae_loss(self, recon_x, x, mu, logvar):
         """Standard VAE loss (for a single Gaussian prior)."""
@@ -340,9 +350,8 @@ class VaDE(nn.Module):
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        KLD = -0.5 * torch.sum(1 + logvar - mu**2 -  logvar.exp())
-        return(BCE + KLD)
-
+        KLD = -0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
+        return BCE + KLD
 
     def loss(self, recon_x, x, z, z_mu, z_lv):
         """VaDE loss, with a mixture of gaussians prior."""
@@ -361,30 +370,41 @@ class VaDE(nn.Module):
 
         # log p(z|c)
         logpzc = torch.sum(
-            0.5 * gamma * torch.sum(
-                math.log(2*math.pi) + torch.log(l_3d) +
-                torch.exp(z_lv_t)/l_3d + (z_mu_t-u_3d)**2/l_3d, dim=1), dim=1)
+            0.5
+            * gamma
+            * torch.sum(
+                math.log(2 * math.pi)
+                + torch.log(l_3d)
+                + torch.exp(z_lv_t) / l_3d
+                + (z_mu_t - u_3d) ** 2 / l_3d,
+                dim=1,
+            ),
+            dim=1,
+        )
 
         # log q(z|x)
-        qentropy = -0.5 * torch.sum(1 + z_lv + math.log(2*math.pi), 1)
+        qentropy = -0.5 * torch.sum(1 + z_lv + math.log(2 * math.pi), 1)
 
         # log p(c)
-        logpc = -torch.sum(torch.log(t_2d)*gamma, 1)
+        logpc = -torch.sum(torch.log(t_2d) * gamma, 1)
 
         # log q(c|x)
-        logqcx = torch.sum(torch.log(gamma)*gamma, 1)
+        logqcx = torch.sum(torch.log(gamma) * gamma, 1)
 
         # Normalise by same number of elements as in reconstruction.
-        print("bce={}, gammma={}, logpzc={}, qentropy={}, logpc={}, logqcx={}".format(
-            torch.mean(bce),
-            torch.mean(gamma),
-            torch.mean(logpzc),
-            torch.mean(qentropy),
-            torch.mean(logpc),
-            torch.mean(logqcx)))
+        print(
+            "bce={}, gammma={}, logpzc={}, qentropy={}, logpc={}, logqcx={}".format(
+                torch.mean(bce),
+                torch.mean(gamma),
+                torch.mean(logpzc),
+                torch.mean(qentropy),
+                torch.mean(logpc),
+                torch.mean(logqcx),
+            )
+        )
         loss = torch.mean(bce + logpzc + qentropy + logpc + logqcx)
 
-        return(loss)
+        return loss
 
     def log_mle(self, x, num_samples):
         weight = torch.zeros(x.size(0))
@@ -394,13 +414,15 @@ class VaDE(nn.Module):
             log_pz = self._log_pz_samples(z)
 
             log_px = torch.sum(
-                x*torch.log(torch.clamp(recon_x, min=EPS)) +
-                (1-x)*torch.log(torch.clamp(1-recon_x, min=EPS)), 1)
+                x * torch.log(torch.clamp(recon_x, min=EPS))
+                + (1 - x) * torch.log(torch.clamp(1 - recon_x, min=EPS)),
+                1,
+            )
 
             log_qz = self._log_qz_samples(z, mu, logvar)
             weight += torch.exp(log_px + log_pz - log_qz).data
 
-        return(torch.log(torch.clamp(weight/num_samples, min=1e-40)))
+        return torch.log(torch.clamp(weight / num_samples, min=1e-40))
 
     def save_model(self, path):
         torch.save(self.state_dict(), path)

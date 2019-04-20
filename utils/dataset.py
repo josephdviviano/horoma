@@ -59,7 +59,7 @@ class HoromaDataset(Dataset):
         # Ignore the labels for some kinds of training data.
         # TODO: Resolve why this is different from previous team? They
         #       seemed to be working with different data.
-        #if os.path.exists(filename_y) and not split.startswith("train"):
+        # if os.path.exists(filename_y) and not split.startswith("train"):
         IGNORE_LABELS = ["train_overlapped", "train"]
         if os.path.exists(filename_y) and split not in IGNORE_LABELS:
             pre_targets = np.loadtxt(filename_y, 'U2')
