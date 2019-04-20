@@ -5,6 +5,10 @@ from transformers import EncoderLayer, EncoderTaskLayer, EncoderTaskLayer2
 
 
 class TransformerNet(nn.Module):
+    """ this model is written for 1-dimensional data (originally for 
+    omsignal ecg data) This is taken as is form b2pomt_baseline code 
+    given by TAs for omsignal project.
+    """
     def __init__(
         self,
         input_size,
@@ -20,7 +24,6 @@ class TransformerNet(nn.Module):
         dropout=0.1,
     ):
         super(TransformerNet, self).__init__()
-        # self.preprocess = pp.Preprocessor()
 
         self.conv1 = nn.Conv1d(input_size, hidden_size, kernel_size)
         # size of output
@@ -72,8 +75,6 @@ class TransformerNet(nn.Module):
 
         output_modules = [
             nn.Sequential(
-                # EncoderLayer(hidden_size, inner_dim, n_heads, key_dim, val_dim, dropout=dropout, attn_flag=False),
-                # EncoderLayer(hidden_size, inner_dim, n_heads, key_dim, val_dim, dropout=dropout, attn_flag=False),
                 EncoderTaskLayer2(
                     hidden_size,
                     inner_dim,
@@ -130,6 +131,10 @@ class TransformerNet(nn.Module):
 
 
 class TransformerNet2D(nn.Module):
+    """ This is a modification of TransformerNet() defined above for
+    making it work with 3-dimensional data (images)
+    """
+
     def __init__(
         self,
         input_size,
@@ -146,7 +151,6 @@ class TransformerNet2D(nn.Module):
         use_transformer=True,
     ):
         super(TransformerNet2D, self).__init__()
-        # self.preprocess = pp.Preprocessor()
 
         self.use_transformer = use_transformer
 
@@ -201,8 +205,6 @@ class TransformerNet2D(nn.Module):
 
         output_modules = [
             nn.Sequential(
-                # EncoderLayer(hidden_size, inner_dim, n_heads, key_dim, val_dim, dropout=dropout, attn_flag=False),
-                # EncoderLayer(hidden_size, inner_dim, n_heads, key_dim, val_dim, dropout=dropout, attn_flag=False),
                 EncoderTaskLayer2(
                     hidden_size,
                     inner_dim,

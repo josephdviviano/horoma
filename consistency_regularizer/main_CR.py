@@ -205,22 +205,11 @@ def main():
         split="train",
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True, # set it true for 1D model
-        # subset=10000,
     )
-
-    # all_labeled_dataset = horoma_dataset.HoromaDataset(
-    #     data_dir=args.data_dir,
-    #     split="full_labeled",
-    #     transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
-    #     # flattened=True, # set it true for 1D model
-    # )
-    # splitter = horoma_dataset.SplitDataset(split=0.8)
-    # train_labeled_dataset, valid_dataset = splitter(all_labeled_dataset)
 
     train_labeled_dataset = horoma_dataset.HoromaDataset(
         data_dir=args.data_dir,
         split="train_labeled_overlapped",
-        # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         transforms=HoromaTransforms(),
         # flattened=True, # set it true for 1D model
     )
@@ -228,7 +217,6 @@ def main():
     valid_dataset = horoma_dataset.HoromaDataset(
         data_dir=args.data_dir,
         split="valid",
-        # transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor(), transforms.Normalize(mean=[0.56121268, 0.20801756, 0.2602411], std=[0.22911494, 0.10410614, 0.11500103])]),
         transforms=transforms.Compose([transforms.ToPILImage(), transforms.ToTensor()]),
         # flattened=True, # set it true for 1D model
     )
@@ -243,24 +231,6 @@ def main():
         val_batch_size=args.eval_batch_size,
         workers=args.workers,
     )
-
-    # -------------- model params for 1d model --------------
-    # input_channels = 1
-    # target_labels = targets.split(",")
-    # target_labels = [s.lower().strip() for s in target_labels]
-    # if len(target_labels) == 1:
-    #     out_size = target_out_size_dict[target_labels[0]]
-    # else:
-    #     out_size = [target_out_size_dict[a] for a in target_labels]
-    # n_layers = 0  # hyper-parameter
-    # hidden_size = 256  # hyper-parameter # 128
-    # kernel_size = 8  # for CNN1D only
-    # pool_size = 4  # for CNN1D only
-    # dropout = 0.2
-    # n_heads = 8  # 4
-    # key_dim = 128
-    # val_dim = 128
-    # inner_dim = 128
 
     # -------------- model params for 2d model --------------
     input_channels = 3
@@ -280,7 +250,6 @@ def main():
     val_dim = 128
     inner_dim = 128
 
-    # model = models.TransformerNet( # 1d model
     model = models.TransformerNet2D(  # 2d model
         input_channels,
         out_size,

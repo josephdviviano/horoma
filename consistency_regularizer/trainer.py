@@ -9,6 +9,10 @@ import utils
 
 
 class Trainer:
+    """
+    The class is used for running the training process and for 
+    maintaining the states of the training process.
+    """
     def __init__(
         self,
         args,
@@ -268,6 +272,9 @@ class Trainer:
         utils.save_checkpoint(model, self.args.iters, filename, optimizer)
 
     def eval(self, model, data_iterators, key="val"):
+        """
+        This is called on validation set during the training.
+        """
         assert key in ("val", "test")
         assert not (data_iterators[key] is None)
         criterion = self.criterion

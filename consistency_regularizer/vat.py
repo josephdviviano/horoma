@@ -113,7 +113,7 @@ class VATRegLoss(nn.Module):
 class MultiTaskVATLoss(nn.Module):
 
     def __init__(self, vat_type, weight, var=0.1, xi=10.0, eps=1.0, ip=1):
-        """VAT loss
+        """VAT loss (not needed for horoma as we have just one task)
         :param vat_type: Type (classification, regression) for each task considered
         :param weight: Weight contribution for each task considered
         :param var: Assumed Variance of the predicted Gaussian (default: 0.1)
@@ -188,7 +188,7 @@ class MultiTaskVATLoss(nn.Module):
 class StochasticPertubationLoss(nn.Module):
 
     def __init__(self, vat_type, weight, var=0.1, xi=10.0, eps=1.0, ip=1):
-        """VAT loss
+        """Stochastic perturbation method
         :param vat_type: Type (classification, regression) for each task considered
         :param weight: Weight contribution for each task considered
         :param var: Assumed Variance of the predicted Gaussian (default: 0.1)
@@ -252,7 +252,7 @@ class StochasticPertubationLoss(nn.Module):
 class MeanTeacherRegLoss(nn.Module):
 
     def __init__(self, vat_type, weight, var=0.1, xi=10.0, eps=1.0, ip=1):
-        """VAT loss
+        """Mean teacher method
         :param vat_type: Type (classification, regression) for each task considered
         :param weight: Weight contribution for each task considered
         :param var: Assumed Variance of the predicted Gaussian (default: 0.1)

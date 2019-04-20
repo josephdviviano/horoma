@@ -32,20 +32,6 @@ class HoromaDataset(Dataset):
         width = 32
         datatype = "uint8"
 
-        # if split == "train":
-        #     self.nb_examples = 150900
-        # elif split == "valid":
-        #     self.nb_examples = 480
-        # elif split == "test":
-        #     self.nb_examples = 498
-        # elif split == "train_overlapped":
-        #     self.nb_examples = 544749
-        # elif split == "valid_overlapped":
-        #     self.nb_examples = 1331
-        # else:
-        #     raise ("Dataset: Invalid split. "
-        #            "Must be [train, valid, test, train_overlapped, valid_overlapped]")
-
         if split == "train":
             self.nb_examples = 152_000
         elif split == "train_labeled":
@@ -205,134 +191,12 @@ class SplitDataset:
         return train_set, valid_set
 
 
-class KFoldSplitDataset:
-    def __init__(self, split=0.9, permutation=1):
-        """
-        Callable class that performs a k-split according to the region.
-
-        :param split: The proportion of examples to keep in the training set.
-        :param permutation:
-        """
-
-        assert 0 < split < 1
-
-        self.split = split
-        self.permutation = permutation
-
-    def __call__(self, dataset):
-        """
-        Takes a dataset and returns a split between training and validation.
-
-        :param dataset: The original dataset to split.
-        :return:
-        train_set: The new training set.
-        valid_set: The new validation set.
-        """
-        n = len(dataset)
-
-        unique_regions, unique_region_inverse, unique_region_counts = np.unique(
-            dataset.region_ids, return_counts=True, return_inverse=True
-        )
-        unique_regions = np.arange(unique_region_inverse.max() + 1)
-
-        n_split = int(self.split * len(dataset))
-
-        unique_regions = np.concatenate(
-            [unique_regions[self.permutation:], unique_regions[: self.permutation]]
-        )
-
-        cumsum = np.cumsum(unique_region_counts[unique_regions])
-
-        last_region = np.argmax(1 * (cumsum > n_split))
-
-        train_regions = unique_regions[:last_region]
-        valid_regions = unique_regions[last_region:]
-
-        indices = np.arange(n)
-
-        train_indices = indices[np.isin(unique_region_inverse, train_regions)]
-        valid_indices = indices[np.isin(unique_region_inverse, valid_regions)]
-
-        train_set = Subset(dataset, train_indices)
-        valid_set = Subset(dataset, valid_indices)
-
-        return train_set, valid_set
-
-
-class FullDataset(Dataset):
-    def __init__(self, dataset):
-
-        self.dataset = dataset
-        self.dataset.transforms = None
-
-        indices = np.arange(len(self)) % len(dataset)
-
-        self.region_ids = self.dataset.region_ids[indices]
-        self.targets = self.dataset.targets[indices]
-
-    @staticmethod
-    def transform(img, transform):
-
-        img = functional.to_pil_image(img)
-
-        if transform >= 11:
-            transform += 1
-
-        transforms = np.zeros((2 * 2 * 4))
-        transforms[transform] = 1
-        transforms.reshape((2, 2, 4))
-
-        a = transform // (2 * 2)
-        transform = transform % (2 * 2)
-        h = transform // 2
-        v = transform % 2
-
-        if v == 1:
-            img = functional.vflip(img)
-        if h == 1:
-            img = functional.hflip(img)
-
-        angle = a * 90
-        img = functional.rotate(img, angle)
-
-        return img
-
-    def __len__(self):
-        return 15 * len(self.dataset)
-
-    def __getitem__(self, item):
-
-        transform = item // len(self.dataset)
-        i = item % len(self.dataset)
-
-        data = self.dataset[i]
-
-        label = None
-
-        if isinstance(data, tuple):
-            img, label = data
-        else:
-            img = data
-
-        img = self.transform(img, transform)
-        img = functional.to_tensor(img)
-
-        if label is None:
-            return img
-        else:
-            return img, label
-
-
 if __name__ == "__main__":
     dataset = HoromaDataset(
         data_dir="/rap/jvb-000-aa/COURS2019/etudiants/data/horoma",
         split="train",
         transforms=functional.to_pil_image,
     )
-
-    # dataset = FullDataset(dataset)
-
-    # loader = DataLoader(dataset, shuffle=False, batch_size=100)
 
     splitter = SplitDataset(0.9)
 

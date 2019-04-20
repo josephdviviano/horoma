@@ -1,6 +1,8 @@
 # ConvNet model with consistency regularization
 
-All the files needed for running this model are lying flat in this folder.
+All the files needed for running this model are lying flat in this folder.<br>
+One thing to note is that most of the scripts here are taken from code for b2pomt_baseline given by TAs for block-2 of OMSignal project. Since OMSignal had multi-task problem so code is written in such a way that it can run for multi-task optimization. It would be usefule to keep this in mind when trying to understand the implementations.
+
 
 ## Usage
 
