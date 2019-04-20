@@ -150,7 +150,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_12 --checkpoint_dir checkpoin
 ```bash
 python main_CR.py --tensorboard_dir tensorboard/hs_13 --checkpoint_dir checkpoints/hs_13/ --alpha 1 --dropout 0.6
 ```
-* best f1: 0.6887
+* best f1: 0.6687
 
 
 ## setting 14 (hs-14)
