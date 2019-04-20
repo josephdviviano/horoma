@@ -7,6 +7,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_1 --checkpoint_dir checkpoint
 ```
 * best f1: 0.6359
 
+
 ## settings 2 (hs-2)
 
 * flatten images (1d data and 1d conv model)
@@ -20,6 +21,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_2/ --checkpoint_dir checkpoin
 
 * best f1: 0.6058
 
+
 ## setting 3 (hs-3)
 
 * prediction module without transformer. 
@@ -30,6 +32,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_3 --checkpoint_dir checkpoint
 ```
 
 * best f1: 0.58387
+
 
 ## setting 4 (hs-4)
 
@@ -66,6 +69,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_6 --checkpoint_dir checkpoint
 
 * best f1:  0.6495
 
+
 ## setting 7 (hs-7)
 
 * dropout = 0.6 (dafault was 0.5)
@@ -89,6 +93,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_8 --checkpoint_dir checkpoint
 
 * best f1: 0.623
 
+
 ## setting 9 (hs-9)
 
 * remove entropy loss
@@ -100,6 +105,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_9 --checkpoint_dir checkpoint
 
 * best f1: 0.6226
 
+
 ## setting 10 (hs-10)
 
 * remove entropy loss, and regularization coefficient: alpha = 0.0
@@ -110,6 +116,7 @@ python main_CR.py --tensorboard_dir tensorboard/hs_10 --checkpoint_dir checkpoin
 ```
 
 * best f1: 0.61908
+
 
 ## setting 11 (hs-11)
 
@@ -143,6 +150,8 @@ python main_CR.py --tensorboard_dir tensorboard/hs_12 --checkpoint_dir checkpoin
 ```bash
 python main_CR.py --tensorboard_dir tensorboard/hs_13 --checkpoint_dir checkpoints/hs_13/ --alpha 1 --dropout 0.6
 ```
+* best f1: 0.6887
+
 
 ## setting 14 (hs-14)
 
@@ -152,3 +161,4 @@ python main_CR.py --tensorboard_dir tensorboard/hs_13 --checkpoint_dir checkpoin
 ```bash
 python main_CR.py --tensorboard_dir tensorboard/hs_14 --checkpoint_dir checkpoints/hs_14/ --alpha 0.5 --dropout 0.7
 ```
+* best f1: 0.661
